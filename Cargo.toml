@@ -1,5 +1,6 @@
 [package]
 name = "fission"
+authors = ["James Walker <walkah@walkah.net>"]
 version = "0.1.0"
 edition = "2021"
 

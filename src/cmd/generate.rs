@@ -11,10 +11,10 @@ pub enum GenerateCommands {
     #[clap(about = "Generate an Ed25519 key pair and an associated DID")]
     Credentials,
 }
-pub fn run_command(g: Generate) -> () {
+pub fn run_command(g: Generate) {
     match g.command {
         GenerateCommands::Credentials => {
-            println!("Credentials")
+            todo!("credentials")
         }
     }
 }

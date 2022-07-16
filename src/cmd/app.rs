@@ -1,4 +1,4 @@
-use clap::{Args, Subcommand};
+use clap::{ArgEnum, Args, Subcommand};
 
 #[derive(Args)]
 pub struct App {
@@ -9,23 +9,59 @@ pub struct App {
 #[derive(Subcommand)]
 pub enum AppCommands {
     #[clap(about = "Delegate capability to an audience DID")]
-    Delegate,
+    Delegate {
+        #[clap(short, long, value_parser, help = "The target app")]
+        app_name: Option<String>,
+        #[clap(short, long, value_parser, help = "An audience DID")]
+        did: Option<String>,
+        #[clap(
+            short,
+            long,
+            arg_enum,
+            value_parser,
+            default_value = "append",
+            help = "The potency to delegate"
+        )]
+        potency: Potency,
+        #[clap(
+            short,
+            long,
+            value_parser,
+            default_value_t = 300,
+            help = "Lifetime in seconds before UCAN expires"
+        )]
+        lifetime: u16,
+        #[clap(short, long, help = "Only output the UCAN on success")]
+        quiet: bool,
+    },
     #[clap(about = "Upload the working directory")]
     Publish,
     #[clap(about = "Initialize an existing app")]
     Register,
 }
 
-pub fn run_command(a: App) -> () {
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, ArgEnum)]
+pub enum Potency {
+    Append,
+    Destroy,
+    SuperUser,
+}
+pub fn run_command(a: App) {
     match a.command {
-        AppCommands::Delegate => {
-            println!("Delegate")
+        AppCommands::Delegate {
+            app_name: _,
+            did: _,
+            potency: _,
+            lifetime: _,
+            quiet: _,
+        } => {
+            todo!("delegate")
         }
         AppCommands::Publish => {
-            println!("Publish")
+            todo!("publish")
         }
         AppCommands::Register => {
-            println!("Register")
+            todo!("register")
         }
     }
 }

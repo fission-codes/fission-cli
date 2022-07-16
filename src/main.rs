@@ -2,6 +2,7 @@ use clap::{Parser, Subcommand};
 use fission::cmd::{
     app::{run_command as run_app_command, App},
     generate::{run_command as run_generate_command, Generate},
+    setup::run_command as run_setup_command,
     user::{run_command as run_user_command, User},
 };
 
@@ -29,9 +30,7 @@ fn main() {
     match cli.command {
         Commands::App(a) => run_app_command(a),
         Commands::Generate(g) => run_generate_command(g),
-        Commands::Setup => {
-            println!("Setup")
-        }
+        Commands::Setup => run_setup_command(),
         Commands::User(u) => run_user_command(u),
     }
 }

@@ -14,13 +14,13 @@ pub enum UserCommands {
     Whoami,
 }
 
-pub fn run_command(u: User) -> () {
+pub fn run_command(u: User) {
     match u.command {
         UserCommands::Login => {
-            println!("Login")
+            todo!("login")
         }
         UserCommands::Whoami => {
-            println!("Whoami")
+            todo!("whoami")
         }
     }
 }
