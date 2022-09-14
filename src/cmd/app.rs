@@ -35,7 +35,12 @@ pub enum AppCommands {
         quiet: bool,
     },
     #[clap(about = "Upload the working directory")]
-    Publish,
+    Publish {
+        #[clap(short, long, help = "Open your default browser after publish")]
+        open: bool,
+        #[clap(short, long, help = "Watch for changes & automatically trigger upload")]
+        watch: bool,
+    },
     #[clap(about = "Initialize an existing app")]
     Register,
 }
@@ -57,7 +62,7 @@ pub fn run_command(a: App) {
         } => {
             todo!("delegate")
         }
-        AppCommands::Publish => {
+        AppCommands::Publish { open: _, watch: _ } => {
             todo!("publish")
         }
         AppCommands::Register => {

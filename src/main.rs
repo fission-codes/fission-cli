@@ -20,7 +20,10 @@ enum Commands {
     #[clap(about = "Generate key pairs and DIDs")]
     Generate(Generate),
     #[clap(about = "Initial Fission setup")]
-    Setup,
+    Setup {
+        #[clap(short, long, value_parser, help = "The username to register")]
+        username: Option<String>,
+    },
     #[clap(about = "User application management")]
     User(User),
 }
@@ -30,7 +33,7 @@ fn main() {
     match cli.command {
         Commands::App(a) => run_app_command(a),
         Commands::Generate(g) => run_generate_command(g),
-        Commands::Setup => run_setup_command(),
+        Commands::Setup { username } => run_setup_command(username),
         Commands::User(u) => run_user_command(u),
     }
 }

@@ -30,7 +30,7 @@
         # `nix develop`
         devShells.default = pkgs.mkShell {
           name = "fission";
-          nativeBuildInputs = with pkgs; [ rustup ];
+          nativeBuildInputs = with pkgs; [ libiconv rustup ];
         };
       });
 }
