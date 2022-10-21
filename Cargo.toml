@@ -9,5 +9,7 @@ edition = "2021"
 [dependencies]
 bs58 = "0.4.0"
 base64 = "0.13.0"
+rand = "0.8.5"
 clap = { version = "3.2.12", features = ["derive"] }
 ed25519-zebra = "3.0.0"
+colored = "2.0.0"
