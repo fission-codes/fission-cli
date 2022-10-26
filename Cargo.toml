@@ -13,3 +13,5 @@ base64 = "0.13.0"
 clap = { version = "3.2.12", features = ["derive"] }
 did-key = "0.1.1"
 colored = "2.0.0"
+serde = { version = "1.0", features = ["derive"] } 
+serde_json = "1.0.87"
