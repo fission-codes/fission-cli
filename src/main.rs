@@ -53,6 +53,11 @@ fn main() {
             Ok(()) => (),
             Err(_err) => eprintln!("💥 Failed to execute setup command."),
         },
-        Commands::User(u) => run_user_command(u),
+        Commands::User(u) => match run_user_command(u) {
+            Ok(()) => (),
+            Err(_err) => eprintln!(
+                "💥 Failed to execute user command.",
+            ),
+        },
     }
 }

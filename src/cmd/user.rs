@@ -1,4 +1,6 @@
+use anyhow::Result;
 use clap::{Args, Subcommand};
+use std::process::Command;
 
 #[derive(Args)]
 pub struct User {
@@ -17,13 +19,18 @@ pub enum UserCommands {
     Whoami,
 }
 
-pub fn run_command(u: User) {
+pub fn run_command(u: User) -> Result<()> {
     match u.command {
         UserCommands::Login { username: _ } => {
             todo!("login")
         }
         UserCommands::Whoami => {
-            todo!("whoami")
+            Command::new("fission")
+                .args(["user", "whoami"])
+                .spawn()?
+                .wait()?;
+
+            Ok(())
         }
     }
 }
