@@ -1,5 +1,18 @@
 use std::iter::once;
 
+/// Convert flag tuples to a vector of flag strings
+/// 
+/// This function is glue to reformat flags parsed by CLAP for
+/// Command::args (https://doc.rust-lang.org/std/process/struct.Command.html#method.args).
+/// 
+/// It keeps flags CLAP parsed as True and drops False flags.
+pub fn prepare_flags(flags: &[(&str, &bool)]) -> Vec<String> {
+  flags.iter()
+      .filter(|tup| *tup.1)
+      .flat_map(|tup| once(tup.0.to_string()))
+      .collect()
+}
+
 /// Convert argument tuples to a vector of argument strings.
 /// 
 /// This function is glue to reformat args parsed by CLAP for
