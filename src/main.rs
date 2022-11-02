@@ -3,7 +3,7 @@ use fission::cmd::{
     app::{run_command as run_app_command, App},
     generate::{run_command as run_generate_command, Generate},
     setup::run_command as run_setup_command,
-    user::{run_command as run_user_command, User},
+    user::{run_command as run_user_command, User, UserCommands},
 };
 
 #[derive(Parser)]
@@ -37,6 +37,10 @@ enum Commands {
     },
     #[clap(about = "User application management")]
     User(User),
+
+    // Shortcuts
+    #[clap(about = "Display current user")]
+    Whoami,
 }
 fn main() {
     let cli = Cli::parse();
@@ -55,9 +59,15 @@ fn main() {
         },
         Commands::User(u) => match run_user_command(u) {
             Ok(()) => (),
-            Err(_err) => eprintln!(
-                "💥 Failed to execute user command.",
-            ),
+            Err(_err) => eprintln!("💥 Failed to execute user command.",),
+        },
+
+        // Shortcuts
+        Commands::Whoami => match run_user_command(User {
+            command: UserCommands::Whoami,
+        }) {
+            Ok(()) => (),
+            Err(_err) => eprintln!("💥 Failed to execute whoami command.",),
         },
     }
 }

@@ -6,7 +6,7 @@ use std::process::Command;
 #[derive(Args)]
 pub struct User {
     #[clap(subcommand)]
-    command: UserCommands,
+    pub command: UserCommands,
 }
 
 #[derive(Subcommand)]
