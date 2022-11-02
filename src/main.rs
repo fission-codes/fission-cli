@@ -23,6 +23,17 @@ enum Commands {
     Setup {
         #[clap(short, long, value_parser, help = "The username to register")]
         username: Option<String>,
+        #[clap(short, long, value_parser, help = "The email address for the account")]
+        email: Option<String>,
+        #[clap(
+            short,
+            long = "with-key",
+            value_parser,
+            help = "A root keyfile to import"
+        )]
+        keyfile: Option<String>,
+        #[clap(short, long, value_parser, help = "Override OS detection")]
+        os: Option<String>,
     },
     #[clap(about = "User application management")]
     User(User),
@@ -33,7 +44,15 @@ fn main() {
     match cli.command {
         Commands::App(a) => run_app_command(a),
         Commands::Generate(g) => run_generate_command(g),
-        Commands::Setup { username } => run_setup_command(username),
+        Commands::Setup {
+            username,
+            email,
+            keyfile,
+            os,
+        } => match run_setup_command(username, email, keyfile, os) {
+            Ok(()) => (),
+            Err(_err) => eprintln!("💥 Failed to execute setup command."),
+        },
         Commands::User(u) => run_user_command(u),
     }
 }
