@@ -46,7 +46,10 @@ fn main() {
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::App(a) => run_app_command(a),
+        Commands::App(a) => match run_app_command(a) {
+            Ok(()) => (),
+            Err(_err) => eprintln!("💥 Failed to execute app command."),
+        },
         Commands::Generate(g) => run_generate_command(g),
         Commands::Setup {
             username,
