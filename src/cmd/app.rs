@@ -1,4 +1,7 @@
+use crate::legacy::{prepare_args, prepare_flags};
+use anyhow::Result;
 use clap::{ArgEnum, Args, Subcommand};
+use std::process::Command;
 
 #[derive(Args)]
 pub struct App {
@@ -36,10 +39,43 @@ pub enum AppCommands {
     },
     #[clap(about = "Upload the working directory")]
     Publish {
+        #[clap(
+            help = "The file path of the assets or directory to sync",
+            default_value = "./"
+        )]
+        path: String,
         #[clap(short, long, help = "Open your default browser after publish")]
         open: bool,
         #[clap(short, long, help = "Watch for changes & automatically trigger upload")]
         watch: bool,
+        #[clap(
+            long = "ipfs-bin",
+            help = "Path to IPFS binary [default: `which ipfs`]",
+            value_name = "BIN_PATH"
+        )]
+        ipfs_bin: Option<String>,
+        #[clap(
+            long = "ipfs-timeout",
+            help = "IPFS timeout",
+            default_value = "1800",
+            value_name = "SECONDS"
+        )]
+        ipfs_timeout: String,
+
+        #[clap(
+            long = "update-data",
+            help = "Upload the data",
+            default_value = "True",
+            value_name = "ARG"
+        )]
+        update_data: String,
+        #[clap(
+            long = "udpate-dns",
+            help = "Update DNS",
+            default_value = "True",
+            value_name = "ARG"
+        )]
+        update_dns: String,
     },
     #[clap(about = "Initialize an existing app")]
     Register {
@@ -93,8 +129,36 @@ pub fn run_command(a: App) -> Result<()> {
         } => {
             todo!("delegate")
         }
-        AppCommands::Publish { open: _, watch: _ } => {
-            todo!("publish")
+        AppCommands::Publish {
+            path,
+            open,
+            watch,
+            ipfs_bin,
+            ipfs_timeout,
+            update_data,
+            update_dns,
+        } => {
+            let flags = prepare_flags(&[
+                ("-o", &open),
+                ("-w", &watch)
+            ]);
+
+            let args = prepare_args(&[
+                ("--ipfs-bin", ipfs_bin.as_ref()),
+                ("--ipfs-timeout", Some(ipfs_timeout).as_ref()),
+                ("--update-data", Some(update_data).as_ref()),
+                ("--update-dns", Some(update_dns).as_ref()),
+            ]);
+
+            Command::new("fission")
+                .args(["app", "publish"])
+                .arg(path)
+                .args(flags)
+                .args(args)
+                .spawn()?
+                .wait()?;
+
+            Ok(())
         }
         AppCommands::Register {
             app_dir,
