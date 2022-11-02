@@ -1,3 +1,4 @@
+use crate::legacy::prepare_args;
 use anyhow::Result;
 use clap::{Args, Subcommand};
 use std::process::Command;
@@ -21,8 +22,16 @@ pub enum UserCommands {
 
 pub fn run_command(u: User) -> Result<()> {
     match u.command {
-        UserCommands::Login { username: _ } => {
-            todo!("login")
+        UserCommands::Login { username } => {
+            let args = prepare_args(&[("-u", username.as_ref())]);
+
+            Command::new("fission")
+                .args(["user", "login"])
+                .args(args)
+                .spawn()?
+                .wait()?;
+
+            Ok(())
         }
         UserCommands::Whoami => {
             Command::new("fission")
