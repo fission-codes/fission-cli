@@ -13,15 +13,14 @@ pub struct App {
 pub enum AppCommands {
     #[clap(about = "Delegate capability to an audience DID")]
     Delegate {
-        #[clap(short, long, value_parser, help = "The target app")]
+        #[clap(short, long, value_name = "NAME", help = "The target app")]
         app_name: Option<String>,
-        #[clap(short, long, value_parser, help = "An audience DID")]
+        #[clap(short, long, help = "An audience DID")]
         did: Option<String>,
         #[clap(
             short,
             long,
-            arg_enum,
-            value_parser,
+            value_enum,
             default_value = "append",
             help = "The potency to delegate"
         )]
@@ -120,16 +119,43 @@ pub enum Potency {
     Destroy,
     SuperUser,
 }
+
+impl Potency {
+    fn to_string(&self) -> String {
+        match self {
+            Potency::Append => "Append".to_string(),
+            Potency::Destroy => "Destroy".to_string(),
+            Potency::SuperUser => "Super_User".to_string(),
+        }
+    }
+}
+
 pub fn run_command(a: App) -> Result<()> {
     match a.command {
         AppCommands::Delegate {
-            app_name: _,
-            did: _,
-            potency: _,
-            lifetime: _,
-            quiet: _,
+            app_name,
+            did,
+            lifetime,
+            potency,
+            quiet,
         } => {
-            todo!("delegate")
+            let flags = prepare_flags(&[("-q", &quiet)]);
+
+            let args = prepare_args(&[
+                ("-a", app_name.as_ref()),
+                ("-d", did.as_ref()),
+                ("-l", Some(lifetime.to_string()).as_ref()),
+                ("-p", Some(potency.to_string()).as_ref()),
+            ]);
+
+            Command::new("fission")
+                .args(["app", "delegate"])
+                .args(flags)
+                .args(args)
+                .spawn()?
+                .wait()?;
+
+            Ok(())
         }
         AppCommands::Info => {
             Command::new("fission")
