@@ -37,6 +37,8 @@ pub enum AppCommands {
         #[clap(short, long, help = "Only output the UCAN on success")]
         quiet: bool,
     },
+    #[clap(about = "Detail about the current app")]
+    Info,
     #[clap(about = "Upload the working directory")]
     Publish {
         #[clap(
@@ -129,6 +131,14 @@ pub fn run_command(a: App) -> Result<()> {
         } => {
             todo!("delegate")
         }
+        AppCommands::Info => {
+            Command::new("fission")
+                .args(["app", "info"])
+                .spawn()?
+                .wait()?;
+
+            Ok(())
+        }
         AppCommands::Publish {
             path,
             open,
@@ -138,10 +148,7 @@ pub fn run_command(a: App) -> Result<()> {
             update_data,
             update_dns,
         } => {
-            let flags = prepare_flags(&[
-                ("-o", &open),
-                ("-w", &watch)
-            ]);
+            let flags = prepare_flags(&[("-o", &open), ("-w", &watch)]);
 
             let args = prepare_args(&[
                 ("--ipfs-bin", ipfs_bin.as_ref()),
