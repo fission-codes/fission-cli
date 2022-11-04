@@ -71,7 +71,7 @@ pub enum AppCommands {
         )]
         update_data: String,
         #[clap(
-            long = "udpate-dns",
+            long = "update-dns",
             help = "Update DNS",
             default_value = "True",
             value_name = "ARG"
