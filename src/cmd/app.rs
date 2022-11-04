@@ -28,16 +28,20 @@ pub enum AppCommands {
         #[clap(
             short,
             long,
-            value_parser,
             default_value_t = 300,
             help = "Lifetime in seconds before UCAN expires"
         )]
         lifetime: u16,
         #[clap(short, long, help = "Only output the UCAN on success")]
         quiet: bool,
+        #[clap(from_global)]
+        verbose: bool,
     },
     #[clap(about = "Detail about the current app")]
-    Info,
+    Info {
+        #[clap(from_global)]
+        verbose: bool,
+    },
     #[clap(about = "Upload the working directory")]
     Publish {
         #[clap(
@@ -62,7 +66,6 @@ pub enum AppCommands {
             value_name = "SECONDS"
         )]
         ipfs_timeout: String,
-
         #[clap(
             long = "update-data",
             help = "Upload the data",
@@ -77,6 +80,8 @@ pub enum AppCommands {
             value_name = "ARG"
         )]
         update_dns: String,
+        #[clap(from_global)]
+        verbose: bool,
     },
     #[clap(about = "Initialize an existing app")]
     Register {
@@ -110,6 +115,8 @@ pub enum AppCommands {
             value_name = "SECONDS"
         )]
         ipfs_timeout: String,
+        #[clap(from_global)]
+        verbose: bool,
     },
 }
 
@@ -138,9 +145,10 @@ pub fn run_command(a: App) -> Result<()> {
             lifetime,
             potency,
             quiet,
+            verbose,
         } => {
+            // N.B. The wrapped app delegate command does not accept verbose
             let flags = prepare_flags(&[("-q", &quiet)]);
-
             let args = prepare_args(&[
                 ("-a", app_name.as_ref()),
                 ("-d", did.as_ref()),
@@ -150,16 +158,19 @@ pub fn run_command(a: App) -> Result<()> {
 
             Command::new("fission")
                 .args(["app", "delegate"])
-                .args(flags)
                 .args(args)
+                .args(flags)
                 .spawn()?
                 .wait()?;
 
             Ok(())
         }
-        AppCommands::Info => {
+        AppCommands::Info { verbose } => {
+            let flags = prepare_flags(&[("-v", &verbose)]);
+
             Command::new("fission")
                 .args(["app", "info"])
+                .args(flags)
                 .spawn()?
                 .wait()?;
 
@@ -173,9 +184,9 @@ pub fn run_command(a: App) -> Result<()> {
             ipfs_timeout,
             update_data,
             update_dns,
+            verbose,
         } => {
-            let flags = prepare_flags(&[("-o", &open), ("-w", &watch)]);
-
+            let flags = prepare_flags(&[("-o", &open), ("-w", &watch), ("-v", &verbose)]);
             let args = prepare_args(&[
                 ("--ipfs-bin", ipfs_bin.as_ref()),
                 ("--ipfs-timeout", Some(ipfs_timeout).as_ref()),
@@ -186,8 +197,8 @@ pub fn run_command(a: App) -> Result<()> {
             Command::new("fission")
                 .args(["app", "publish"])
                 .arg(path)
-                .args(flags)
                 .args(args)
+                .args(flags)
                 .spawn()?
                 .wait()?;
 
@@ -199,7 +210,9 @@ pub fn run_command(a: App) -> Result<()> {
             name,
             ipfs_bin,
             ipfs_timeout,
+            verbose,
         } => {
+            let flags = prepare_flags(&[("-v", &verbose)]);
             let args = prepare_args(&[
                 ("-a", Some(app_dir).as_ref()),
                 ("-b", build_dir.as_ref()),
@@ -211,6 +224,7 @@ pub fn run_command(a: App) -> Result<()> {
             Command::new("fission")
                 .args(["app", "register"])
                 .args(args)
+                .args(flags)
                 .spawn()?
                 .wait()?;
 

@@ -9,6 +9,8 @@ use fission::cmd::{
 #[derive(Parser)]
 #[clap(author, version, about="Fission makes developing, deploying, updating, and iterating on web apps quick and easy.", long_about = None)]
 struct Cli {
+    #[clap(short, long, global = true, help = "Print detailed output")]
+    verbose: bool,
     #[clap(subcommand)]
     command: Commands,
 }
@@ -34,13 +36,18 @@ enum Commands {
         keyfile: Option<String>,
         #[clap(short, long, value_parser, help = "Override OS detection")]
         os: Option<String>,
+        #[clap(from_global)]
+        verbose: bool,
     },
     #[clap(about = "User application management")]
     User(User),
 
     // Shortcuts
     #[clap(about = "Display current user")]
-    Whoami,
+    Whoami {
+        #[clap(from_global)]
+        verbose: bool,
+    },
 }
 fn main() {
     let cli = Cli::parse();
@@ -56,7 +63,8 @@ fn main() {
             email,
             keyfile,
             os,
-        } => match run_setup_command(username, email, keyfile, os) {
+            verbose,
+        } => match run_setup_command(username, email, keyfile, os, verbose) {
             Ok(()) => (),
             Err(_err) => eprintln!("💥 Failed to execute setup command."),
         },
@@ -66,8 +74,8 @@ fn main() {
         },
 
         // Shortcuts
-        Commands::Whoami => match run_user_command(User {
-            command: UserCommands::Whoami,
+        Commands::Whoami { verbose } => match run_user_command(User {
+            command: UserCommands::Whoami { verbose },
         }) {
             Ok(()) => (),
             Err(_err) => eprintln!("💥 Failed to execute whoami command.",),
