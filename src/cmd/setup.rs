@@ -18,7 +18,7 @@ pub fn run_command(
         ("-u", username.as_ref()),
         ("-e", email.as_ref()),
         ("-k", keyfile.as_ref()),
-        ("os", os.as_ref()),
+        ("--os", os.as_ref()),
     ]);
 
     Command::new("fission")
