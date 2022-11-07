@@ -12,6 +12,7 @@ pub fn run_command(
     keyfile: Option<String>,
     os: Option<String>,
     verbose: bool,
+    remote: Option<String>,
 ) -> Result<()> {
     let flags = prepare_flags(&[("-v", &verbose)]);
     let args = prepare_args(&[
@@ -19,6 +20,7 @@ pub fn run_command(
         ("-e", email.as_ref()),
         ("-k", keyfile.as_ref()),
         ("--os", os.as_ref()),
+        ("-R", remote.as_ref()),
     ]);
 
     Command::new("fission")

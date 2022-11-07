@@ -36,11 +36,15 @@ pub enum AppCommands {
         quiet: bool,
         #[clap(from_global)]
         verbose: bool,
+        #[clap(from_global)]
+        remote: Option<String>,
     },
     #[clap(about = "Detail about the current app")]
     Info {
         #[clap(from_global)]
         verbose: bool,
+        #[clap(from_global)]
+        remote: Option<String>,
     },
     #[clap(about = "Upload the working directory")]
     Publish {
@@ -82,6 +86,8 @@ pub enum AppCommands {
         update_dns: String,
         #[clap(from_global)]
         verbose: bool,
+        #[clap(from_global)]
+        remote: Option<String>,
     },
     #[clap(about = "Initialize an existing app")]
     Register {
@@ -117,6 +123,8 @@ pub enum AppCommands {
         ipfs_timeout: String,
         #[clap(from_global)]
         verbose: bool,
+        #[clap(from_global)]
+        remote: Option<String>,
     },
 }
 
@@ -146,6 +154,7 @@ pub fn run_command(a: App) -> Result<()> {
             potency,
             quiet,
             verbose,
+            remote,
         } => {
             // N.B. The wrapped app delegate command does not accept verbose
             let flags = prepare_flags(&[("-q", &quiet)]);
@@ -154,6 +163,7 @@ pub fn run_command(a: App) -> Result<()> {
                 ("-d", did.as_ref()),
                 ("-l", Some(lifetime.to_string()).as_ref()),
                 ("-p", Some(potency.to_string()).as_ref()),
+                ("-R", remote.as_ref()),
             ]);
 
             Command::new("fission")
@@ -165,11 +175,13 @@ pub fn run_command(a: App) -> Result<()> {
 
             Ok(())
         }
-        AppCommands::Info { verbose } => {
+        AppCommands::Info { verbose, remote} => {
             let flags = prepare_flags(&[("-v", &verbose)]);
+            let args = prepare_args(&[("-R", remote.as_ref())]);
 
             Command::new("fission")
                 .args(["app", "info"])
+                .args(args)
                 .args(flags)
                 .spawn()?
                 .wait()?;
@@ -185,6 +197,7 @@ pub fn run_command(a: App) -> Result<()> {
             update_data,
             update_dns,
             verbose,
+            remote,
         } => {
             let flags = prepare_flags(&[("-o", &open), ("-w", &watch), ("-v", &verbose)]);
             let args = prepare_args(&[
@@ -192,6 +205,7 @@ pub fn run_command(a: App) -> Result<()> {
                 ("--ipfs-timeout", Some(ipfs_timeout).as_ref()),
                 ("--update-data", Some(update_data).as_ref()),
                 ("--update-dns", Some(update_dns).as_ref()),
+                ("-R", remote.as_ref()),
             ]);
 
             Command::new("fission")
@@ -211,6 +225,7 @@ pub fn run_command(a: App) -> Result<()> {
             ipfs_bin,
             ipfs_timeout,
             verbose,
+            remote,
         } => {
             let flags = prepare_flags(&[("-v", &verbose)]);
             let args = prepare_args(&[
@@ -219,6 +234,7 @@ pub fn run_command(a: App) -> Result<()> {
                 ("-n", name.as_ref()),
                 ("--ipfs-bin", ipfs_bin.as_ref()),
                 ("--ipfs-timeout", Some(ipfs_timeout).as_ref()),
+                ("-R", remote.as_ref()),
             ]);
 
             Command::new("fission")

@@ -11,6 +11,8 @@ use fission::cmd::{
 struct Cli {
     #[clap(short, long, global = true, help = "Print detailed output")]
     verbose: bool,
+    #[clap(short = 'R', long, global = true, hide = true)]
+    remote: Option<String>,
     #[clap(subcommand)]
     command: Commands,
 }
@@ -38,6 +40,8 @@ enum Commands {
         os: Option<String>,
         #[clap(from_global)]
         verbose: bool,
+        #[clap(short = 'R', long, global = true, hide = true)]
+        remote: Option<String>,
     },
     #[clap(about = "User application management")]
     User(User),
@@ -47,6 +51,8 @@ enum Commands {
     Whoami {
         #[clap(from_global)]
         verbose: bool,
+        #[clap(short = 'R', long, global = true, hide = true)]
+        remote: Option<String>,
     },
 }
 fn main() {
@@ -64,7 +70,8 @@ fn main() {
             keyfile,
             os,
             verbose,
-        } => match run_setup_command(username, email, keyfile, os, verbose) {
+            remote
+        } => match run_setup_command(username, email, keyfile, os, verbose, remote) {
             Ok(()) => (),
             Err(_err) => eprintln!("💥 Failed to execute setup command."),
         },
@@ -74,8 +81,8 @@ fn main() {
         },
 
         // Shortcuts
-        Commands::Whoami { verbose } => match run_user_command(User {
-            command: UserCommands::Whoami { verbose },
+        Commands::Whoami { verbose, remote } => match run_user_command(User {
+            command: UserCommands::Whoami { verbose, remote },
         }) {
             Ok(()) => (),
             Err(_err) => eprintln!("💥 Failed to execute whoami command.",),

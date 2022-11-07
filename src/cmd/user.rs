@@ -17,19 +17,23 @@ pub enum UserCommands {
         username: Option<String>,
         #[clap(from_global)]
         verbose: bool,
+        #[clap(from_global)]
+        remote: Option<String>,
     },
     #[clap(about = "Display current user")]
     Whoami {
         #[clap(from_global)]
         verbose: bool,
+        #[clap(from_global)]
+        remote: Option<String>,
     },
 }
 
 pub fn run_command(u: User) -> Result<()> {
     match u.command {
-        UserCommands::Login { username, verbose } => {
+        UserCommands::Login { username, verbose, remote } => {
             let flags = prepare_flags(&[("-v", &verbose)]);
-            let args = prepare_args(&[("-u", username.as_ref())]);
+            let args = prepare_args(&[("-u", username.as_ref()), ("-R", remote.as_ref())]);
 
             Command::new("fission")
                 .args(["user", "login"])
@@ -40,11 +44,13 @@ pub fn run_command(u: User) -> Result<()> {
 
             Ok(())
         }
-        UserCommands::Whoami { verbose } => {
+        UserCommands::Whoami { verbose, remote } => {
             let flags = prepare_flags(&[("-v", &verbose)]);
+            let args = prepare_args(&[("-R", remote.as_ref())]);
 
             Command::new("fission")
                 .args(["user", "whoami"])
+                .args(args)
                 .args(flags)
                 .spawn()?
                 .wait()?;
