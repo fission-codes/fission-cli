@@ -1,7 +1,7 @@
 use crate::legacy::{prepare_args, prepare_flags};
 use anyhow::Result;
 use clap::{Args, Subcommand};
-use std::process::Command;
+use std::{collections::HashMap, process::Command};
 
 #[derive(Args)]
 pub struct User {
@@ -31,13 +31,19 @@ pub enum UserCommands {
 
 pub fn run_command(u: User) -> Result<()> {
     match u.command {
-        UserCommands::Login { username, verbose, remote } => {
-            let flags = prepare_flags(&[("-v", &verbose)]);
-            let args = prepare_args(&[("-u", username.as_ref()), ("-R", remote.as_ref())]);
+        UserCommands::Login {
+            username,
+            verbose,
+            remote,
+        } => {
+            let args = prepare_args(&HashMap::from([("-u", username.as_ref())]));
+            let remote = prepare_args(&HashMap::from([("-R", remote.as_ref())]));
+            let flags = prepare_flags(&HashMap::from([("-v", verbose)]));
 
             Command::new("fission")
                 .args(["user", "login"])
                 .args(args)
+                .args(remote)
                 .args(flags)
                 .spawn()?
                 .wait()?;
@@ -45,12 +51,12 @@ pub fn run_command(u: User) -> Result<()> {
             Ok(())
         }
         UserCommands::Whoami { verbose, remote } => {
-            let flags = prepare_flags(&[("-v", &verbose)]);
-            let args = prepare_args(&[("-R", remote.as_ref())]);
+            let remote = prepare_args(&HashMap::from([("-R", remote.as_ref())]));
+            let flags = prepare_flags(&HashMap::from([("-v", verbose)]));
 
             Command::new("fission")
                 .args(["user", "whoami"])
-                .args(args)
+                .args(remote)
                 .args(flags)
                 .spawn()?
                 .wait()?;

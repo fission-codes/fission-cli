@@ -1,7 +1,7 @@
 use crate::legacy::{prepare_args, prepare_flags};
 use anyhow::Result;
 use clap::{ArgEnum, Args, Subcommand};
-use std::process::Command;
+use std::{collections::HashMap, process::Command};
 
 #[derive(Args)]
 pub struct App {
@@ -156,32 +156,34 @@ pub fn run_command(a: App) -> Result<()> {
             verbose,
             remote,
         } => {
-            // N.B. The wrapped app delegate command does not accept verbose
-            let flags = prepare_flags(&[("-q", &quiet)]);
-            let args = prepare_args(&[
+            let args = prepare_args(&HashMap::from([
                 ("-a", app_name.as_ref()),
                 ("-d", did.as_ref()),
                 ("-l", Some(lifetime.to_string()).as_ref()),
                 ("-p", Some(potency.to_string()).as_ref()),
-                ("-R", remote.as_ref()),
-            ]);
+            ]));
+            let remote = prepare_args(&HashMap::from([("-R", remote.as_ref())]));
+
+            // N.B. The wrapped app delegate command does not accept verbose
+            let flags = prepare_flags(&HashMap::from([("-q", quiet)]));
 
             Command::new("fission")
                 .args(["app", "delegate"])
                 .args(args)
+                .args(remote)
                 .args(flags)
                 .spawn()?
                 .wait()?;
 
             Ok(())
         }
-        AppCommands::Info { verbose, remote} => {
-            let flags = prepare_flags(&[("-v", &verbose)]);
-            let args = prepare_args(&[("-R", remote.as_ref())]);
+        AppCommands::Info { verbose, remote } => {
+            let remote = prepare_args(&HashMap::from([("-R", remote.as_ref())]));
+            let flags = prepare_flags(&HashMap::from([("-v", verbose)]));
 
             Command::new("fission")
                 .args(["app", "info"])
-                .args(args)
+                .args(remote)
                 .args(flags)
                 .spawn()?
                 .wait()?;
@@ -199,19 +201,24 @@ pub fn run_command(a: App) -> Result<()> {
             verbose,
             remote,
         } => {
-            let flags = prepare_flags(&[("-o", &open), ("-w", &watch), ("-v", &verbose)]);
-            let args = prepare_args(&[
+            let args = prepare_args(&HashMap::from([
                 ("--ipfs-bin", ipfs_bin.as_ref()),
                 ("--ipfs-timeout", Some(ipfs_timeout).as_ref()),
                 ("--update-data", Some(update_data).as_ref()),
                 ("--update-dns", Some(update_dns).as_ref()),
-                ("-R", remote.as_ref()),
-            ]);
+            ]));
+            let remote = prepare_args(&HashMap::from([("-R", remote.as_ref())]));
+            let flags = prepare_flags(&HashMap::from([
+                ("-o", open),
+                ("-w", watch),
+                ("-v", verbose),
+            ]));
 
             Command::new("fission")
                 .args(["app", "publish"])
                 .arg(path)
                 .args(args)
+                .args(remote)
                 .args(flags)
                 .spawn()?
                 .wait()?;
@@ -227,19 +234,20 @@ pub fn run_command(a: App) -> Result<()> {
             verbose,
             remote,
         } => {
-            let flags = prepare_flags(&[("-v", &verbose)]);
-            let args = prepare_args(&[
+            let args = prepare_args(&HashMap::from([
                 ("-a", Some(app_dir).as_ref()),
                 ("-b", build_dir.as_ref()),
                 ("-n", name.as_ref()),
                 ("--ipfs-bin", ipfs_bin.as_ref()),
                 ("--ipfs-timeout", Some(ipfs_timeout).as_ref()),
-                ("-R", remote.as_ref()),
-            ]);
+            ]));
+            let remote = prepare_args(&HashMap::from([("-R", remote.as_ref())]));
+            let flags = prepare_flags(&HashMap::from([("-v", verbose)]));
 
             Command::new("fission")
                 .args(["app", "register"])
                 .args(args)
+                .args(remote)
                 .args(flags)
                 .spawn()?
                 .wait()?;
