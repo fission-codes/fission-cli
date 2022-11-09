@@ -2,6 +2,7 @@ use crate::ipfs::Ipfs;
 use anyhow::{Result, bail};
 use super::options::*;
 use serde_json::Value;
+use futures::{join, Future};
 use std::io::Read;
 use std::collections::HashMap;
 use async_trait::async_trait;
@@ -85,6 +86,16 @@ impl IpfsViaDaemon {
         }
         anyhow::Ok(())
     }
+    async fn swarm_or_bootstrap_cmd(&mut self, cmd:&str, peer_id:&str) -> Result<Vec<String>>{
+        let args = HashMap::from([
+            ("arg", peer_id)
+        ]);
+        let cmd_options = CmdOptions::new(cmd, &args);
+        let result_data = self.send_request(&cmd_options).await?;
+        let result_json:Value = serde_json::from_str(std::str::from_utf8(result_data.as_slice())?)?;
+        let peer_list:Vec<String> = value_to_vec(&result_json, "peer")?;
+        return anyhow::Ok(peer_list);
+    }
 }
 #[async_trait]
 impl Ipfs for IpfsViaDaemon {
@@ -110,27 +121,42 @@ impl Ipfs for IpfsViaDaemon {
     }
 
     async fn add_bootstrap(&mut self, peer_id:&str) -> Result<Vec<String>> {
-        let cmd = "bootstrap/add";
-        let args = HashMap::from([
-            ("arg", peer_id)
-        ]);
-        let cmd_options = CmdOptions::new(cmd, &args);
-        let result_data = self.send_request(&cmd_options).await?;
-        let result_json:Value = serde_json::from_str(std::str::from_utf8(result_data.as_slice())?)?;
-        let peer_list:Vec<String> = value_to_vec(&result_json, "peer")?;
-        return anyhow::Ok(peer_list);
+        self.swarm_or_bootstrap_cmd("bootstrap/add", peer_id).await
     }
 
     async fn connect_to(&mut self, peer_id:&str) -> Result<Vec<String>> {
-        todo!()
+        self.swarm_or_bootstrap_cmd("swarm/connect", peer_id).await
     }
 
     async fn disconect_from(&mut self, peer_id:&str)-> Result<Vec<String>> {
-        todo!()
+        self.swarm_or_bootstrap_cmd("swarm/disconnect", peer_id).await
     }
 
-    async fn config(&mut self, options:HashMap<String, String>) -> Result<HashMap<String, String>> {
-        todo!()
+    async fn config(&mut self, options:HashMap<String, String>) -> Result<()> {
+        for (setting, value) in options {
+            let cleaned_value = value.to_lowercase();
+            let is_bool = match cleaned_value.trim() == "true" || cleaned_value.trim() == "false" {
+                true => "true",
+                false => "false"
+            };
+            let is_json = match serde_json::from_str::<Value>(&value).is_ok() {
+                true => "true",
+                false => "false"
+            };
+            let args = HashMap::from([
+                ("arg".to_string(), setting.to_string()),
+                ("arg".to_string(), value.to_string()),
+                ("bool".to_string(), is_bool.to_string()),
+                ("json".to_string(), is_json.to_string())
+            ]);
+            let cmd_options = CmdOptions{
+                cmd:"config".to_string(),
+                post_options:None,
+                args
+            };
+            self.send_request(&cmd_options).await?;
+        }
+        anyhow::Ok(())
     }
 }
 impl Drop for IpfsViaDaemon {

@@ -16,5 +16,5 @@ pub trait Ipfs {
     async fn add_bootstrap(&mut self, peer_id:&str) -> Result<Vec<String>>;
     async fn connect_to(&mut self, peer_id:&str) -> Result<Vec<String>>;
     async fn disconect_from(&mut self, peer_id:&str)-> Result<Vec<String>>;
-    async fn config(&mut self, options:HashMap<String, String>) -> Result<HashMap<String, String>>;
+    async fn config(&mut self, options:HashMap<String, String>) -> Result<()>;
 }
