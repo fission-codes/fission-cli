@@ -2,8 +2,6 @@ use crate::ipfs::Ipfs;
 use anyhow::{Result, bail};
 use super::options::*;
 use serde_json::Value;
-use futures::{join, Future};
-use std::io::Read;
 use std::collections::HashMap;
 use async_trait::async_trait;
 use std::process::{Command, Child};
@@ -15,12 +13,13 @@ use std::thread::sleep;
 pub struct IpfsViaDaemon {
     http:HttpHandler, 
     ipfs_process:Child,
-    is_ipfs_ready:bool,
-    last_ipfs_output:Vec<u8>
+    is_ipfs_ready:bool
 }
 impl IpfsViaDaemon {
     pub fn new() -> Result<IpfsViaDaemon> {
+        println!("{}", "Configuring ipfs...".green());
         IpfsViaDaemon::configure()?;
+        println!("{}", "Starting ipfs...".green());
         let proccess = Command::new(IPFS_EXE)
         .arg("daemon")
         .spawn()?;
@@ -28,17 +27,26 @@ impl IpfsViaDaemon {
         anyhow::Ok(IpfsViaDaemon{
             ipfs_process: proccess, 
             http: HttpHandler::new(), 
-            is_ipfs_ready: false,
-            last_ipfs_output: vec![]
+            is_ipfs_ready: false
         })
     }
     fn configure() -> Result<()>{
         //This sets the API's address
-        let address = format!("/ip4/{}/tcp/{}", IPFS_ADDR, IPFS_PORT);
+        //let api_addr = format!("/ip4/{}/tcp/{}", IPFS_ADDR, IPFS_API_PORT);
+        let api_addr = format!("/ip4/{}/tcp/{}", IPFS_ADDR, IPFS_API_PORT);
+        let http_addr = format!("/ip4/{}/tcp/{}", IPFS_ADDR, IPFS_HTTP_PORT);
+        //let http_addr = format!("/ip4/{}/tcp/{}", IPFS_ADDR, IPFS_HTTP_PORT);
+        IpfsViaDaemon::config_option("Addresses.API", &api_addr)?;
+        IpfsViaDaemon::config_option("Addresses.Gateway", &http_addr)?;
+        anyhow::Ok(())
+    }
+    fn config_option(option:&str, value:&str)-> Result<()>{
+        let cmd_str = format!("ipfs {} Addresses.API {}", option, value);
+        println!("running cmd \"{}\"", cmd_str.blue());
         let is_addr_set = Command::new(IPFS_EXE)
             .arg("config")
-            .arg("Addresses.API")
-            .arg(address)
+            .arg(option)
+            .arg(value)
             .spawn()?
             .wait()?
             .success();
@@ -47,34 +55,22 @@ impl IpfsViaDaemon {
         }
         anyhow::Ok(())
     }
-    async fn send_request(&mut self, options:&CmdOptions) -> Result<Vec<u8>>{
-        self.await_ready()?;
-        let response = self.http.send_request(options);
+    async fn send_request<F, V>(&mut self, options:&CmdOptions, response_handler:F) -> Result<V>
+    where F: Fn(Vec<u8>) -> Result<V>{
+        self.await_ready().await?;
+        let response = self.http.try_send_request(options, response_handler);
         anyhow::Ok(response.await?)
     }
-    fn await_ready(&mut self) -> Result<()>{
+    async fn await_ready(&mut self) -> Result<()>{
         if self.is_ipfs_ready == true { return anyhow::Ok(());}
         let start_time = SystemTime::now();
         loop {
-            match &mut self.ipfs_process.stdout {
-                Some(out) => {
-                    let mut buffer:Vec<u8> = vec![];
-                    out.read_to_end(&mut buffer)?;
-                    self.last_ipfs_output.append(&mut buffer);
-                    drop(buffer);
-
-                    let text_so_far = match std::str::from_utf8(self.last_ipfs_output.as_slice()){
-                        Ok(text) => text,
-                        Err(_) => ""
-                    };
-                    if text_so_far.contains(READY_TEXT){
-                        self.is_ipfs_ready = true;
-                        break;
-                    }else if text_so_far.contains("\n") {
-                        self.last_ipfs_output.clear();
-                    }
-                },
-                None => ()
+            println!("{}", "checking if ipfs is ready...".green());
+            
+            if self.poll_ipfs_ready().await {
+                println!("{}", "IPFS is ready!!".green());
+                self.is_ipfs_ready = true;
+                break;
             }
 
             sleep(Duration::new(SLEEP_LENGTH as u64, 0));
@@ -86,14 +82,43 @@ impl IpfsViaDaemon {
         }
         anyhow::Ok(())
     }
+    async fn poll_ipfs_ready(&mut self) -> bool{
+        let args = HashMap::new();
+        let cmd = CmdOptions::new("config/show", &args);
+        let response = self.http.send_request(&cmd).await;
+        return match response {
+            Ok(_) => true,
+            Err(e) => {
+                eprint!("{}", e); 
+                false
+            }
+        };
+    }
     async fn swarm_or_bootstrap_cmd(&mut self, cmd:&str, peer_id:&str) -> Result<Vec<String>>{
         let args = HashMap::from([
             ("arg", peer_id)
         ]);
         let cmd_options = CmdOptions::new(cmd, &args);
-        let result_data = self.send_request(&cmd_options).await?;
-        let result_json:Value = serde_json::from_str(std::str::from_utf8(result_data.as_slice())?)?;
-        let peer_list:Vec<String> = value_to_vec(&result_json, "peer")?;
+        let peer_list = self.send_request(&cmd_options, |result_data| {
+            let result_str =std::str::from_utf8(result_data.as_slice())?;
+            let result_json:Value = match serde_json::from_str(result_str){
+                Ok(x) => x,
+                Err(_) => bail!("The was error parsing the server's response! The server's response is as follows: \n {}", result_str)
+            };
+            let peer_list = match value_to_vec::<String>(&result_json, "Strings"){
+                Ok(peers) => {
+                    for peer in peers.iter() {
+                        if !peer.contains("success"){
+                            bail!("The following peer did not successfully connect: {}", peer)
+                        }
+                    }
+                    anyhow::Ok(peers)
+                },
+                Err(_) => bail!("The was error parsing the server's response! The server's response is as follows: \n {}", result_str)
+            };
+            anyhow::Ok(peer_list?)
+        }).await?;
+
         return anyhow::Ok(peer_list);
     }
 }
@@ -112,8 +137,10 @@ impl Ipfs for IpfsViaDaemon {
             ("Content-Type", "application/octet-stream")
         ]);
         let cmd_options = CmdOptions::new(cmd, &args).to_post(&headers, contents.as_slice());
-        let result_data = self.send_request(&cmd_options).await?;
-        return anyhow::Ok(std::str::from_utf8(result_data.as_slice())?.to_string());
+        let result = self.send_request(&cmd_options, |result_data| {
+            anyhow::Ok(std::str::from_utf8(result_data.as_slice())?.to_string())
+        }).await?;
+        return anyhow::Ok(result);
     }
 
     async fn add_directory(&mut self, path:&str) -> Result<String> {
@@ -154,7 +181,7 @@ impl Ipfs for IpfsViaDaemon {
                 post_options:None,
                 args
             };
-            self.send_request(&cmd_options).await?;
+            self.send_request(&cmd_options, |_| anyhow::Ok(())).await?;
         }
         anyhow::Ok(())
     }
@@ -162,7 +189,7 @@ impl Ipfs for IpfsViaDaemon {
 impl Drop for IpfsViaDaemon {
     fn drop(&mut self) {
         self.ipfs_process.kill().unwrap();
-        println!("{}", ("Ipfs proccess closed. Feel free to close app whenever. ✅".bright_green()))
+        println!("{}", ("Ipfs proccess closed successfully. Feel free to close app whenever. ✅".bright_green()))
     }
 }
 //TODO: This needs to be move to utils
@@ -185,4 +212,20 @@ fn value_to_vec<A>(json:&Value, index:&str) -> Result<Vec<A>>
         },
         None => bail!("Improperly formatted Json: Cant locate index {}", index)
     })   
+}
+
+#[cfg(test)]
+mod tests {
+    use futures::executor::block_on;
+
+    use super::*;
+
+    #[test]
+    fn can_connect(){
+        println!("starting test");
+        let peer_id = "/dns4/production-ipfs-cluster-us-east-1-node2.runfission.com/tcp/4003/wss/p2p/12D3KooWQ2hL9NschcJ1Suqa1TybJc2ZaacqoQMBT3ziFC7Ye2BZ";
+        let mut ipfs = IpfsViaDaemon::new().unwrap();
+        block_on(ipfs.connect_to(peer_id)).unwrap();
+        assert!(true);
+    }
 }

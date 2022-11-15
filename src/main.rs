@@ -55,6 +55,7 @@ enum Commands {
         remote: Option<String>,
     },
 }
+
 fn main() {
     let cli = Cli::parse();
 
