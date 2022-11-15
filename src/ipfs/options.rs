@@ -1,11 +1,12 @@
 use std::collections::HashMap;
 
-pub const IPFS_PORT:u16 = 4867;
+pub const IPFS_API_PORT:u16 = 4867;
+pub const IPFS_HTTP_PORT:u16 = 5742;
+pub const IPFS_RETRY_ATTEMPTS:u8 = 3;
 pub const IPFS_ADDR:&str = "127.0.0.1";
 pub const IPFS_EXE:&str = "ipfs";
 pub const BOOT_TIME_OUT:u16 = 120;//In seconds
 pub const SLEEP_LENGTH:u8 = 1;//In seconds
-pub const READY_TEXT:&str = "Daemon is ready";
 
 pub struct PostOptions {
     pub headers:HashMap<String, String>,
@@ -30,5 +31,16 @@ impl CmdOptions {
             .collect();
         self.post_options = Some(PostOptions { headers: owned_headers, body: owned_body });
         return self;
+    }
+    pub fn get_url(&self) -> String {
+        let mut arg_str:String = self.args.iter()
+            .flat_map(|(prop, val)| format!("{}={}&", prop, val).chars().collect::<Vec<_>>())
+            .collect();
+        arg_str.pop();
+        let url = format!("http://{}:{}/api/v0/{}", IPFS_ADDR, IPFS_API_PORT, self.cmd);
+        return match arg_str.len() == 0{
+            true => url,
+            false => format!("{}?{}", url, arg_str)
+        }
     }
 }

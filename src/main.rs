@@ -27,6 +27,7 @@ enum Commands {
     #[clap(about = "User application management")]
     User(User),
 }
+
 fn main() {
     let cli = Cli::parse();
 
