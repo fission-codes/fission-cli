@@ -1,9 +1,11 @@
+use std::time::Duration;
+
 use bytes::Bytes;
 
 use colored::Colorize;
 use anyhow::Result;
 use tokio::runtime::Runtime;
-use reqwest::{Client, Response};
+use reqwest::Client;
 use super::options::{CmdOptions, IPFS_RETRY_ATTEMPTS};
 
 pub struct HttpHandler{
@@ -37,10 +39,12 @@ impl HttpHandler {
         println!("response recieved");
         anyhow::Ok(response_bytes.into())
     }
-    pub async fn try_send_request<F, V>(&mut self, options:&CmdOptions, response_handler:F) -> Result<V>
-        where F: Fn(Vec<u8>) -> Result<V>{
-        let mut attempt:u8 = 1;
+    pub async fn try_send_request(&mut self, options:&CmdOptions) -> Result<Vec<u8>>{
+        let mut attempt:u16 = 1;
         'attempt_loop: loop {
+            if attempt != 1 {
+                std::thread::sleep(Duration::new(get_fibinaci(attempt), 0))
+            }
             println!("attempting to send post request: attempt {} of {}", attempt, IPFS_RETRY_ATTEMPTS);
             let is_final_attempt = attempt >= IPFS_RETRY_ATTEMPTS;
             let response_result = self.send_request(options).await;
@@ -54,18 +58,15 @@ impl HttpHandler {
                     }
                 }}
             };
-            let handled_result = match is_final_attempt {
-                true => response_handler(response),
-                false => { match response_handler(response) {
-                    Ok(x) => Ok(x),
-                    Err(_) => {
-                        attempt += 1;
-                        continue 'attempt_loop
-                    }
-                }}
-            };
-            return Ok(handled_result?);
+            return anyhow::Ok(response);
         }
     }
     
+}
+
+fn get_fibinaci(n:u16) -> u64{
+    let phi:f64 = fixed::consts::PHI.to_num();
+    let numerator:f64 = phi.powi(n as i32)-((-phi).powi(n as i32));
+    let denominator:f64 = f64::sqrt(5 as f64);
+    return (numerator/denominator).round() as u64;
 }
