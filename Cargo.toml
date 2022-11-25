@@ -21,6 +21,7 @@ tokio = { version = "1", features = ["full"] }
 async-trait = "0.1.58"
 futures = "0.3.25"
 fixed = "1.20.0"
+walkdir = "2.3.2"
 
 [dev-dependencies]
 proptest = "1.0.0"

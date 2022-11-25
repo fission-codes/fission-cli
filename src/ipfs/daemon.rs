@@ -1,6 +1,7 @@
 use crate::ipfs::Ipfs;
 use anyhow::{Result, bail};
 use futures::executor::block_on;
+use reqwest::header;
 use super::options::*;
 use serde_json::Value;
 use std::collections::HashMap;
@@ -10,6 +11,7 @@ use colored::Colorize;
 use crate::ipfs::http::HttpHandler;
 use std::time::{Duration, SystemTime};
 use std::thread::sleep;
+use walkdir::WalkDir;
 
 pub struct IpfsViaDaemon {
     http:HttpHandler, 
@@ -60,8 +62,12 @@ impl IpfsViaDaemon {
     }
     async fn send_request(&mut self, options:&CmdOptions) -> Result<Vec<u8>>{
         self.await_ready().await?;
-        let response = self.http.try_send_request(options);
-        anyhow::Ok(response.await?)
+        let result = self.http.try_send_request(options, Some(|response_data:Vec<u8>| {
+            let response_str = std::str::from_utf8(response_data.as_slice())?;
+            //TODO: do a better job of checking here
+            anyhow::Ok(!(response_str.contains("\"Type\":\"error\"")))
+        })).await?;
+        anyhow::Ok(result)//it always return Some if a handler is given
     }
     async fn await_ready(&mut self) -> Result<()>{
         if self.is_ipfs_ready == true { return anyhow::Ok(());}
@@ -132,9 +138,8 @@ impl Ipfs for IpfsViaDaemon {
         ]);
         let disposition = format!("form-data; name=\"{}\"; filename=\"{}\"", name, file_name);
         let headers = HashMap::from([
-            ("Abspath", path),
-            ("Content-Disposition", &disposition),
-            ("Content-Type", "application/octet-stream")
+            ("Content-Type", "application/octet-stream"),
+            ("Content-Disposition", &disposition)
         ]);
         let cmd_options = CmdOptions::new(cmd, &args).to_post(&headers, contents.as_slice());
         let result_data = self.send_request(&cmd_options).await?;
@@ -143,7 +148,10 @@ impl Ipfs for IpfsViaDaemon {
     }
 
     async fn add_directory(&mut self, path:&str) -> Result<String> {
-        todo!()
+        for entry in WalkDir::new(path) {
+            print!("{}", std::fs::read_to_string(entry?.path())?)
+        }
+        anyhow::Ok("Done".to_string())
     }
 
     async fn add_bootstrap(&mut self, peer_id:&str) -> Result<Vec<String>> {
@@ -232,6 +240,7 @@ mod tests {
     use proptest::prelude::*;
     use super::*;
 
+    //TODO: Setup pizza 
     const PEER_ADDRS:&'static  [&'static str] = &[
         "/dns4/production-ipfs-cluster-us-east-1-node2.runfission.com/tcp/4003/wss/p2p/12D3KooWQ2hL9NschcJ1Suqa1TybJc2ZaacqoQMBT3ziFC7Ye2BZ",
         "/dns4/production-ipfs-cluster-eu-north-1-node1.runfission.com/tcp/4003/wss/p2p/12D3KooWRwbRrSN2cPAKz4yt1vxBFdh53CpgWjSFK5hZPkzHHz5h",
@@ -271,4 +280,11 @@ mod tests {
     //         assert!(true);
     //     }
     // }
+    #[test]
+    fn can_add_directory(){
+        let testdir = "./test-dir";
+        let mut ipfs = connect_to_peers();
+        block_on(ipfs.add_directory(testdir)).unwrap();
+        assert!(true);
+    }
 }
