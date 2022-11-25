@@ -39,9 +39,11 @@ impl HttpHandler {
         println!("response recieved");
         anyhow::Ok(response_bytes.into())
     }
-    pub async fn try_send_request(&mut self, options:&CmdOptions) -> Result<Vec<u8>>{
-        let mut attempt:u16 = 1;
+    pub async fn try_send_request<F>(&mut self, options:&CmdOptions, handler_option:Option<F>) -> Result<Vec<u8>>
+        where F: Fn(Vec<u8>) -> Result<bool>{
+        let mut attempt:u16 = 0;
         'attempt_loop: loop {
+            attempt += 1;
             if attempt != 1 {
                 std::thread::sleep(Duration::new(get_fibinaci(attempt), 0))
             }
@@ -52,12 +54,19 @@ impl HttpHandler {
                 true => response_result?,
                 false => { match response_result {
                     Ok(x) => x,
-                    Err(_) => {
-                        attempt += 1;
-                        continue 'attempt_loop
-                    }
+                    Err(_) => continue 'attempt_loop
                 }}
             };
+            if is_final_attempt && handler_option.as_ref().is_some(){
+                (handler_option.unwrap())(response.clone())?;
+            }else if handler_option.is_some(){
+                let handler_result = (handler_option.as_ref().unwrap())(response.clone());
+                if handler_result.is_err() {
+                    continue 'attempt_loop;
+                }else if !(handler_result.unwrap()) {
+                    continue 'attempt_loop;
+                }
+            }
             return anyhow::Ok(response);
         }
     }
