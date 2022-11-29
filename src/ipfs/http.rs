@@ -20,27 +20,28 @@ use super::options::*;
 
 pub struct PostOptions {
     pub headers:HashMap<String, String>,
-    pub mime_type: String,
     pub body: Vec<u8>
 }
 pub struct HttpRequest {
     pub addr: String,
     pub args: HashMap<String, String>,
-    post_options: Vec<PostOptions>
+    pub is_multipart:bool,
+    post_options: Vec<PostOptions>//TODO: Better name?
 }
 impl HttpRequest {
-    pub fn new(addr: &str, args: &HashMap<&str, &str>) -> Self{
+    pub fn new(addr: &str, args: &HashMap<&str, &str>, is_multipart:bool) -> Self{
         let owned_args:HashMap<String, String> = args.iter()
             .map(|(key, val)| (key.to_string(), val.to_string()))
             .collect();
-        Self { addr:addr.to_string(), args:owned_args, post_options: vec![] }
+        Self { addr:addr.to_string(), args:owned_args, post_options: vec![], is_multipart }
     }
-    pub fn add_part(&mut self, headers: &HashMap<&str, &str>, mime_type:&str, body: &[u8]){
+    //TODO: Better name?
+    pub fn add_body(&mut self, headers: &HashMap<&str, &str>, body: &[u8]){
         let owned_body = body.to_vec();
         let owned_headers:HashMap<String, String> = headers.iter()
             .map(|(key, val)| (key.to_string(), val.to_string()))
             .collect();
-        self.post_options.push(PostOptions { headers: owned_headers, mime_type:mime_type.to_string(), body: owned_body });
+        self.post_options.push(PostOptions { headers: owned_headers, body: owned_body });
     }
     pub fn get_url(&self) -> String {
         let mut arg_str:String = self.args.iter()
@@ -77,41 +78,42 @@ impl HttpHandler {
         let mut request_builder = Request::builder()
             .method(Method::POST)
             .uri(request_url);
-        let request = match options.post_options.len() {
-            0 | 1 => {
-                for post in options.post_options.iter(){
-                    for (header_key, header_val) in post.headers.iter(){
-                        request_builder = request_builder.header(header_key, header_val)
-                    }
-                }
+        let request = match options.is_multipart {
+            false => {
                 match options.post_options.get(0) {
                     Some(options) => {
+                        for (header_key, header_val) in options.headers.iter(){
+                            request_builder = request_builder.header(header_key, header_val)
+                        }
+
                         let data = options.body.clone();
-                        request_builder
-                            .header("Content-Type", options.mime_type.to_string())
-                            .body(Body::from(data))?
+                        request_builder.body(Body::from(data))?
                     },
                     None => request_builder.body(Body::from(Bytes::new()))?
                 }
             }
-            _ => {
+            true => {
                 let mut body_parts = vec![];
                 for post_options in &options.post_options {
                     write!(body_parts, "--{}\r\n", HTTP_BOUNDARY)?;
                     for (header_prop, header_val) in &post_options.headers {
-                        write!(body_parts, "{}:{}; ", header_prop, header_val)?;
+                        write!(body_parts, "{}: {}\r\n", header_prop, header_val)?;
                     }
                     let data_text = unsafe {
                         //TODO: find a way to do this safely
                         std::str::from_utf8_unchecked(post_options.body.as_slice())
                     };
-                    write!(body_parts, "\r\nContent-Type: {}\r\n", post_options.mime_type)?;
-                    write!(body_parts, "\r\n{}", data_text)?;
+                    write!(body_parts, "\r\n{}\r\n", data_text)?;
                 }
                 write!(body_parts, "--{}--\r\n", HTTP_BOUNDARY)?;
-                request_builder
-                    .header("Content-Type", &*format!("multipart/form-data; boundary={}", HTTP_BOUNDARY))
-                    .body(Body::from(body_parts))?
+                match options.post_options.len() {
+                    0 => request_builder.body(Body::from(Bytes::new()))?,
+                    _ => {
+                        request_builder
+                            .header("Content-Type", &*format!("multipart/form-data; boundary=\"{}\"", HTTP_BOUNDARY))
+                            .body(Body::from(body_parts))?
+                    }
+                }
             }
         };
         let mut response = self.tokio.block_on(async {
