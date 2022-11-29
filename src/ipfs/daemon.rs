@@ -20,10 +20,11 @@ pub struct IpfsViaDaemon {
 }
 impl IpfsViaDaemon {
     pub fn new() -> Result<IpfsViaDaemon> {
-        println!("{}", "Configuring ipfs...".green());
-        IpfsViaDaemon::configure()?;
         println!("{}", "Starting ipfs...".green());
+        let api_addr = format!("/ip4/{}/tcp/{}", IPFS_ADDR, IPFS_API_PORT);
         let proccess = Command::new(IPFS_EXE)
+        .arg("--api")
+        .arg(&api_addr)
         .arg("daemon")
         .spawn()?;
         println!("{}", ("⚠️ Warning: Ipfs Proccess Started. Please do NOT force close this app⚠️".yellow()));
@@ -33,31 +34,6 @@ impl IpfsViaDaemon {
             is_ipfs_ready: false,
             connected_peers: vec![]
         })
-    }
-    fn configure() -> Result<()>{
-        //This sets the API's address
-        //let api_addr = format!("/ip4/{}/tcp/{}", IPFS_ADDR, IPFS_API_PORT);
-        let api_addr = format!("/ip4/{}/tcp/{}", IPFS_ADDR, IPFS_API_PORT);
-        let http_addr = format!("/ip4/{}/tcp/{}", IPFS_ADDR, IPFS_HTTP_PORT);
-        //let http_addr = format!("/ip4/{}/tcp/{}", IPFS_ADDR, IPFS_HTTP_PORT);
-        IpfsViaDaemon::config_option("Addresses.API", &api_addr)?;
-        IpfsViaDaemon::config_option("Addresses.Gateway", &http_addr)?;
-        anyhow::Ok(())
-    }
-    fn config_option(option:&str, value:&str)-> Result<()>{
-        let cmd_str = format!("ipfs {} Addresses.API {}", option, value);
-        println!("running cmd \"{}\"", cmd_str.blue());
-        let is_addr_set = Command::new(IPFS_EXE)
-            .arg("config")
-            .arg(option)
-            .arg(value)
-            .spawn()?
-            .wait()?
-            .success();
-        if !is_addr_set {
-            bail!("Attempted to set the api address, but failed!");
-        }
-        anyhow::Ok(())
     }
     async fn send_request(&mut self, options:&HttpRequest) -> Result<Vec<u8>>{
         self.await_ready().await?;
@@ -243,12 +219,6 @@ impl Ipfs for IpfsViaDaemon {
 }
 impl Drop for IpfsViaDaemon {
     fn drop(&mut self) {
-        // for peer in self.connected_peers.clone(){
-        //     match block_on(self.disconect_from(&peer)){
-        //         Ok(_) => (),
-        //         Err(e) => println!("{}\n{}", "Ipfs was unable to properly disconect from peers before closing".red(), e)
-        //     };
-        // }
         self.ipfs_process.kill().unwrap();
         println!("{}", ("Ipfs proccess closed successfully. Feel free to close app whenever. ✅".bright_green()))
     }
@@ -261,6 +231,7 @@ mod tests {
     // use anyhow::Result;
     // use proptest::prelude::*;
     use super::*;
+    use serial_test::serial;
 
     //TODO: Setup pizza 
     const PEER_ADDRS:&'static  [&'static str] = &[
@@ -305,8 +276,9 @@ mod tests {
     //     }
     // }
     #[test]
+    #[serial]
     fn can_add_directory(){
-        let test_dir = "./test-dir";
+        let test_dir = "./test-dir/more-tests";
         let mut ipfs = connect_to_peers();
         let res = block_on(ipfs.add_directory(test_dir)).unwrap();
         println!("Server responded with:\n {}", res.green());
@@ -333,12 +305,13 @@ mod tests {
                 assert!(res.contains(&fixed_path));
             });
     }
-    // #[test]
-    // fn can_add_file(){
-    //     let test_file = "./test-dir/more/fission_logo.png";
-    //     let mut ipfs = connect_to_peers();
-    //     let res = block_on(ipfs.add_file(test_file)).unwrap();
-    //     println!("Server responded with:\n {}", res.green());
-    //     assert!(true);
-    // }
+    #[test]
+    #[serial]
+    fn can_add_file(){
+        let test_file = "./test-dir/test.txt";
+        let mut ipfs = connect_to_peers();
+        let res = block_on(ipfs.add_file(test_file)).unwrap();
+        println!("Server responded with:\n {}", res.green());
+        assert!(true);
+    }
 }
