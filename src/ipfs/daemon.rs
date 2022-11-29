@@ -105,10 +105,38 @@ impl IpfsViaDaemon {
 
         return anyhow::Ok(peer_list);
     }
+    fn response_to_hashes(response:&str) -> Result<HashMap<String, String>> {
+        let mut res = response.to_string();
+        let mut ret = HashMap::new();
+        return loop {
+            //get location to take segment to
+            let json_seg_end = match res.find("}") {
+                Some(seg_loc) => seg_loc,
+                None => break anyhow::Ok(ret)
+            };
+            //get segment to convert to json and remove the segment from res
+            let res_vec = res.chars().collect::<Vec<_>>();
+            let json_seg = res_vec[..(json_seg_end+1)].iter().collect::<String>();
+            res = res_vec[(json_seg_end+1)..].iter().collect();
+            //convert that segment to json and value
+            // println!("{}", res.yellow());
+            // println!("{}", json_seg.blue());
+            let json:Value = serde_json::from_str(&json_seg)?;
+            let path = match json.get("Name"){
+                Some(val) => val.to_string(),
+                None => bail!("Could not find Name property in ipfs's response to an add")
+            };
+            let hash = match json.get("Hash"){
+                Some(val) => val.to_string(),
+                None => bail!("Could not find Hash property in ipfs's response to an add")
+            };
+            ret.insert(path, hash);
+        };
+    }
 }
 #[async_trait]
 impl Ipfs for IpfsViaDaemon {
-    async fn add_file(&mut self, path:&str) -> Result<String> {
+    async fn add_file(&mut self, path:&str) -> Result<HashMap<String, String>> {
         let cmd = HttpRequest::get_ipfs_addr()+ "/add";
         let args = HashMap::from([
             ("quieter", "true"),
@@ -124,11 +152,12 @@ impl Ipfs for IpfsViaDaemon {
         let contents = std::fs::read(path)?;
         cmd_options.add_body(&headers, contents.as_slice());
         let result_data = self.send_request(&cmd_options).await?;
-        let result = std::str::from_utf8(result_data.as_slice())?.to_string();
-        return anyhow::Ok(result);
+        let response = std::str::from_utf8(result_data.as_slice())?.to_string();
+        let hashes = Self::response_to_hashes(&response)?;
+        anyhow::Ok(hashes)
     }
 
-    async fn add_directory(&mut self, path:&str) -> Result<String> {
+    async fn add_directory(&mut self, path:&str) -> Result<HashMap<String, String>> {
         let cmd = HttpRequest::get_ipfs_addr()+ "/add";
         let args = HashMap::from([
             ("quieter", "true"),
@@ -159,11 +188,11 @@ impl Ipfs for IpfsViaDaemon {
             ]);
             request.add_body(&headers, data.as_slice());
             println!("{}", file_path.blue());
-
         }
         let response_data = self.send_request(&request).await?;
         let response = std::str::from_utf8(response_data.as_slice())?.to_string();
-        anyhow::Ok(response)
+        let hashes = Self::response_to_hashes(&response)?;
+        anyhow::Ok(hashes)
     }
 
     async fn add_bootstrap(&mut self, peer_id:&str) -> Result<Vec<String>> {
@@ -175,7 +204,7 @@ impl Ipfs for IpfsViaDaemon {
         self.connected_peers.push(peer_id.to_string());
         // print!("Connected Peers: ");
         // self.connected_peers.iter().for_each(|peer| print!("{}, ", peer));
-        anyhow::Ok(response)
+        anyhow::Ok(self.connected_peers.clone())
     }
 
     async fn disconect_from(&mut self, peer_id:&str)-> Result<Vec<String>> {
@@ -190,7 +219,7 @@ impl Ipfs for IpfsViaDaemon {
             }).collect();
         print!("Connected Peers: ");
         self.connected_peers.iter().for_each(|peer| print!("{}, ", peer));
-        anyhow::Ok(response)
+        anyhow::Ok(self.connected_peers.clone())
     }
 
     async fn config(&mut self, options:HashMap<String, String>) -> Result<()> {
@@ -226,6 +255,8 @@ impl Drop for IpfsViaDaemon {
 
 #[cfg(test)]
 mod tests {
+    use std::hash;
+
     use futures::executor::block_on;
     use crate::utils::file_management;
     // use anyhow::Result;
@@ -280,8 +311,11 @@ mod tests {
     fn can_add_directory(){
         let test_dir = "./test-dir/more-tests";
         let mut ipfs = connect_to_peers();
-        let res = block_on(ipfs.add_directory(test_dir)).unwrap();
-        println!("Server responded with:\n {}", res.green());
+        let hashes = block_on(ipfs.add_directory(test_dir)).unwrap();
+        println!("{}","Finnished Hashes:".green());
+        for (path, hash) in &hashes {
+            println!("{}: {}", path.green(), hash.blue())
+        }
 
         let files = file_management::get_files_in(test_dir).unwrap();
         let folders = file_management::get_dirs_in(test_dir).unwrap();
@@ -289,29 +323,26 @@ mod tests {
         files.iter()
             .map(|(path, _)| path)
             .chain(folders.iter())
-            .for_each(|path| {
-                //This removes the "./" at the begginning of paths as the ipfs server responds without them
-                let fixed_path:String = path
-                    .split("/")
-                    .enumerate()
-                    .filter_map(|(i, seg)| {
-                        match i {
-                            0 => None,
-                            1 => Some(seg.to_string()),
-                            _ => Some("/".to_string() + seg)
-                        }
-                    }).collect();
-                println!("checking if response contains path {}", fixed_path);
-                assert!(res.contains(&fixed_path));
+            .for_each(|path_to_match| {
+                assert!(hashes.iter().any(|(path, _)|path_to_match ==path))
             });
+        
+        
     }
     #[test]
     #[serial]
     fn can_add_file(){
         let test_file = "./test-dir/test.txt";
         let mut ipfs = connect_to_peers();
-        let res = block_on(ipfs.add_file(test_file)).unwrap();
-        println!("Server responded with:\n {}", res.green());
-        assert!(true);
+        let hashes = block_on(ipfs.add_file(test_file)).unwrap();
+        println!("{}","Finnished Hashes:\n".green());
+        for (path, hash) in &hashes {
+            println!("{}: {}", path.green(), hash.blue())
+        }
+        assert!(hashes.iter().any(|(path, _)|test_file ==path));
+    }
+    #[test]
+    fn can_config(){
+
     }
 }
