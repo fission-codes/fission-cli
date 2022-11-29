@@ -120,7 +120,7 @@ impl IpfsViaDaemon {
             Ok(peers) => {
                 for peer in peers.iter() {
                     if !peer.contains("success"){
-                        bail!("The following peer did not successfully connect: {}", peer)
+                        bail!("The following peer did not successfully connect or disconnect: {}", peer)
                     }
                 }
                 peers
@@ -244,12 +244,12 @@ impl Ipfs for IpfsViaDaemon {
 }
 impl Drop for IpfsViaDaemon {
     fn drop(&mut self) {
-        for peer in self.connected_peers.clone(){
-            match block_on(self.disconect_from(&peer)){
-                Ok(_) => (),
-                Err(e) => println!("{}\n{}", "Ipfs was unable to properly disconect from peers before closing".red(), e)
-            };
-        }
+        // for peer in self.connected_peers.clone(){
+        //     match block_on(self.disconect_from(&peer)){
+        //         Ok(_) => (),
+        //         Err(e) => println!("{}\n{}", "Ipfs was unable to properly disconect from peers before closing".red(), e)
+        //     };
+        // }
         self.ipfs_process.kill().unwrap();
         println!("{}", ("Ipfs proccess closed successfully. Feel free to close app whenever. ✅".bright_green()))
     }
@@ -283,10 +283,12 @@ mod tests {
     fn connect_to_peers() -> IpfsViaDaemon{
         let mut ipfs = IpfsViaDaemon::new().unwrap();
         for peer in PEER_ADDRS {
-            block_on(ipfs.connect_to(peer)).unwrap();
+            let result_peers = block_on(ipfs.connect_to(peer)).unwrap() ;
+            for result_peer in result_peers {
+                println!("Connected to peer! {}", result_peer);
+            }
         }
-        ipfs
-        
+        return ipfs;
     }
 
     // #[test]
