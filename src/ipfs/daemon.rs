@@ -1,7 +1,8 @@
 use crate::ipfs::Ipfs;
+use crate::utils::*;
 use anyhow::{Result, bail};
 use futures::executor::block_on;
-use reqwest::header;
+use super::http::HttpRequest;
 use super::options::*;
 use serde_json::Value;
 use std::collections::HashMap;
@@ -11,7 +12,6 @@ use colored::Colorize;
 use crate::ipfs::http::HttpHandler;
 use std::time::{Duration, SystemTime};
 use std::thread::sleep;
-use walkdir::WalkDir;
 
 pub struct IpfsViaDaemon {
     http:HttpHandler, 
@@ -60,7 +60,7 @@ impl IpfsViaDaemon {
         }
         anyhow::Ok(())
     }
-    async fn send_request(&mut self, options:&CmdOptions) -> Result<Vec<u8>>{
+    async fn send_request(&mut self, options:&HttpRequest) -> Result<Vec<u8>>{
         self.await_ready().await?;
         let result = self.http.try_send_request(options, Some(|response_data:Vec<u8>| {
             let response_str = std::str::from_utf8(response_data.as_slice())?;
@@ -92,7 +92,8 @@ impl IpfsViaDaemon {
     }
     async fn poll_ipfs_ready(&mut self) -> bool{
         let args = HashMap::new();
-        let cmd = CmdOptions::new("config/show", &args);
+        let addr =  HttpRequest::get_ipfs_addr() + "/config/show";
+        let cmd = HttpRequest::new(&addr, &args);
         let response = self.http.send_request(&cmd).await;
         return match response {
             Ok(_) => true,
@@ -106,14 +107,15 @@ impl IpfsViaDaemon {
         let args = HashMap::from([
             ("arg", peer_id)
         ]);
-        let cmd_options = CmdOptions::new(cmd, &args);
+        let addr = HttpRequest::get_ipfs_addr()+cmd;
+        let cmd_options = HttpRequest::new(&addr, &args);
         let result_data = self.send_request(&cmd_options).await?;
         let result_str =std::str::from_utf8(result_data.as_slice())?;
         let result_json:Value = match serde_json::from_str(result_str){
             Ok(x) => x,
             Err(_) => bail!("The was error parsing the server's response! The server's response is as follows: \n {}", result_str)
         };
-        let peer_list = match value_to_vec::<String>(&result_json, "Strings"){
+        let peer_list = match json::value_to_vec::<String>(&result_json, "Strings"){
             Ok(peers) => {
                 for peer in peers.iter() {
                     if !peer.contains("success"){
@@ -130,46 +132,88 @@ impl IpfsViaDaemon {
 }
 #[async_trait]
 impl Ipfs for IpfsViaDaemon {
-    async fn add_file(&mut self, name:&str, file_name:&str, path:&str, contents:Vec<u8>) -> Result<String> {
-        let cmd = "add";
+    async fn add_file(&mut self, path:&str) -> Result<String> {
+        let name = format!("\"{}\"", file_management::get_name_from_path(path, false));
+        let cmd = HttpRequest::get_ipfs_addr()+ "/add";
         let args = HashMap::from([
             ("quieter", "true"),
-            ("cid-version", "1")
+            ("cid-version", "1"),
+            ("path", &path)
         ]);
-        let disposition = format!("form-data; name=\"{}\"; filename=\"{}\"", name, file_name);
         let headers = HashMap::from([
-            ("Content-Type", "application/octet-stream"),
-            ("Content-Disposition", &disposition)
+            // ("Content-Disposition", "form-data"),
+            ("name", &name as &str),
+            ("filename", &path),
+            ("path", &path)
         ]);
-        let cmd_options = CmdOptions::new(cmd, &args).to_post(&headers, contents.as_slice());
+        let mut cmd_options = HttpRequest::new(&cmd, &args);
+        let contents = std::fs::read(path)?;
+        cmd_options.add_part(&headers, "application/octet-stream", contents.as_slice());
         let result_data = self.send_request(&cmd_options).await?;
         let result = std::str::from_utf8(result_data.as_slice())?.to_string();
         return anyhow::Ok(result);
     }
 
     async fn add_directory(&mut self, path:&str) -> Result<String> {
-        for entry in WalkDir::new(path) {
-            print!("{}", std::fs::read_to_string(entry?.path())?)
+        let cmd = HttpRequest::get_ipfs_addr()+ "/add";
+        let args = HashMap::from([
+            ("quieter", "true"),
+            ("cid-version", "1")
+        ]);
+        let mut request = HttpRequest::new(&cmd, &args);
+        println!("{}", "Adding the following directories..".blue());
+        
+        let dirs = file_management::get_dirs_in(path)?;
+        for dir in dirs{
+            let name = format!("\"{}\"", file_management::get_name_from_path(path, true));
+            let headers = HashMap::from([
+                ("Content-Disposition", " form-data: name=\"files\""),
+                ("filename", &name)
+            ]);
+            request.add_part(&headers, "application/x-directory", &[]);
+            println!("{}", dir.blue());
         }
-        anyhow::Ok("Done".to_string())
+
+        println!("{}", "Adding the following files..".blue());
+        let files = file_management::get_files_in(path)?;
+
+        for (file_path, data) in files {
+            let name = format!("\"{}\"", file_management::get_name_from_path(path, true));
+            let headers = HashMap::from([
+                ("Content-Disposition", " form-data: name=\"files\""),
+                ("filename", &file_path)
+            ]);
+            request.add_part(&headers, "application/octet-stream", data.as_slice());
+            println!("{}", file_path.blue());
+
+        }
+        let response_data = self.send_request(&request).await?;
+        let response = std::str::from_utf8(response_data.as_slice())?.to_string();
+        anyhow::Ok(response)
     }
 
     async fn add_bootstrap(&mut self, peer_id:&str) -> Result<Vec<String>> {
-        self.swarm_or_bootstrap_cmd("bootstrap/add", peer_id).await
+        self.swarm_or_bootstrap_cmd("/bootstrap/add", peer_id).await
     }
 
     async fn connect_to(&mut self, peer_id:&str) -> Result<Vec<String>> {
-        let response = self.swarm_or_bootstrap_cmd("swarm/connect", peer_id).await?;
+        let response = self.swarm_or_bootstrap_cmd("/swarm/connect", peer_id).await?;
         self.connected_peers.push(peer_id.to_string());
-        print!("Connected Peers: ");
-        self.connected_peers.iter().for_each(|peer| print!("{}, ", peer));
+        // print!("Connected Peers: ");
+        // self.connected_peers.iter().for_each(|peer| print!("{}, ", peer));
         anyhow::Ok(response)
     }
 
     async fn disconect_from(&mut self, peer_id:&str)-> Result<Vec<String>> {
-        let response = self.swarm_or_bootstrap_cmd("swarm/disconnect", peer_id).await?;
-        self.connected_peers.iter_mut()
-            .filter(|peer_id_to_check| (peer_id_to_check.to_string() != peer_id.to_string()));
+        let response = self.swarm_or_bootstrap_cmd("/swarm/disconnect", peer_id).await?;
+        self.connected_peers = self.connected_peers.iter()
+            .filter_map(|peer_id_to_check| {
+                let checkable = peer_id_to_check.to_string();
+                match peer_id != checkable{
+                    true => Some(checkable),
+                    false => None
+                }
+            }).collect();
         print!("Connected Peers: ");
         self.connected_peers.iter().for_each(|peer| print!("{}, ", peer));
         anyhow::Ok(response)
@@ -187,16 +231,13 @@ impl Ipfs for IpfsViaDaemon {
                 false => "false"
             };
             let args = HashMap::from([
-                ("arg".to_string(), setting.to_string()),
-                ("arg".to_string(), value.to_string()),
-                ("bool".to_string(), is_bool.to_string()),
-                ("json".to_string(), is_json.to_string())
+                ("bool", is_bool),
+                ("json", is_json),
+                ("arg", &setting),
+                ("arg", &value)
             ]);
-            let cmd_options = CmdOptions{
-                cmd:"config".to_string(),
-                post_options:None,
-                args
-            };
+            let addr = HttpRequest::get_ipfs_addr()+"config";
+            let cmd_options = HttpRequest::new(&addr, &args);
             self.send_request(&cmd_options).await?;
         }
         anyhow::Ok(())
@@ -205,32 +246,14 @@ impl Ipfs for IpfsViaDaemon {
 impl Drop for IpfsViaDaemon {
     fn drop(&mut self) {
         for peer in self.connected_peers.clone(){
-            block_on(self.disconect_from(&peer));
+            match block_on(self.disconect_from(&peer)){
+                Ok(_) => (),
+                Err(e) => println!("{}\n{}", "Ipfs was unable to properly disconect from peers before closing".red(), e)
+            };
         }
         self.ipfs_process.kill().unwrap();
         println!("{}", ("Ipfs proccess closed successfully. Feel free to close app whenever. ✅".bright_green()))
     }
-}
-//TODO: This needs to be move to utils
-fn value_to_vec<A>(json:&Value, index:&str) -> Result<Vec<A>> 
-    where A:Clone + for<'de> serde::Deserialize<'de>{
-    anyhow::Ok( match json.get(index) {
-        Some(list_json) => { 
-            match list_json.as_array() {
-                Some(list) => {
-                    list.iter().map(|item_json| {
-                        let item:A = match serde_json::from_value(item_json.clone()){
-                            Ok(x) => x,
-                            Err(_) => panic!("Improperly formatted Json: cannot format type")
-                        };
-                        item
-                    }).collect()
-                },
-                None => panic!("Improperly formatted Json: Not an Array")
-            }
-        },
-        None => bail!("Improperly formatted Json: Cant locate index {}", index)
-    })   
 }
 
 #[cfg(test)]
@@ -266,11 +289,11 @@ mod tests {
         
     }
 
-    #[test]
-    fn can_connect(){
-        connect_to_peers();
-        assert!(true);
-    }
+    // #[test]
+    // fn can_connect(){
+    //     connect_to_peers();
+    //     assert!(true);
+    // }
     // proptest! {
     //     #[test]
     //     #[serial]
@@ -284,7 +307,16 @@ mod tests {
     fn can_add_directory(){
         let testdir = "./test-dir";
         let mut ipfs = connect_to_peers();
-        block_on(ipfs.add_directory(testdir)).unwrap();
+        let res = block_on(ipfs.add_directory(testdir)).unwrap();
+        println!("Server responded with:\n {}", res.green());
         assert!(true);
     }
+    // #[test]
+    // fn can_add_file(){
+    //     let test_file = "./test-dir/more/fission_logo.png";
+    //     let mut ipfs = connect_to_peers();
+    //     let res = block_on(ipfs.add_file(test_file)).unwrap();
+    //     println!("Server responded with:\n {}", res.green());
+    //     assert!(true);
+    // }
 }

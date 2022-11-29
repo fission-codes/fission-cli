@@ -1,15 +1,64 @@
-use std::time::Duration;
+use std::{
+    time::Duration, 
+    collections::HashMap, 
+    io::Write
+};
 
 use bytes::Bytes;
-
 use colored::Colorize;
 use anyhow::Result;
 use tokio::runtime::Runtime;
-use reqwest::Client;
-use super::options::{CmdOptions, IPFS_RETRY_ATTEMPTS};
+use hyper::{
+    Client, Body, Method, Request, 
+    client::HttpConnector,
+    body::HttpBody
+};
+use crate::utils::math;
+
+use super::options::*;
+
+
+pub struct PostOptions {
+    pub headers:HashMap<String, String>,
+    pub mime_type: String,
+    pub body: Vec<u8>
+}
+pub struct HttpRequest {
+    pub addr: String,
+    pub args: HashMap<String, String>,
+    post_options: Vec<PostOptions>
+}
+impl HttpRequest {
+    pub fn new(addr: &str, args: &HashMap<&str, &str>) -> Self{
+        let owned_args:HashMap<String, String> = args.iter()
+            .map(|(key, val)| (key.to_string(), val.to_string()))
+            .collect();
+        Self { addr:addr.to_string(), args:owned_args, post_options: vec![] }
+    }
+    pub fn add_part(&mut self, headers: &HashMap<&str, &str>, mime_type:&str, body: &[u8]){
+        let owned_body = body.to_vec();
+        let owned_headers:HashMap<String, String> = headers.iter()
+            .map(|(key, val)| (key.to_string(), val.to_string()))
+            .collect();
+        self.post_options.push(PostOptions { headers: owned_headers, mime_type:mime_type.to_string(), body: owned_body });
+    }
+    pub fn get_url(&self) -> String {
+        let mut arg_str:String = self.args.iter()
+            .flat_map(|(prop, val)| format!("{}={}&", prop, val).chars().collect::<Vec<_>>())
+            .collect();
+        arg_str.pop();
+        return match arg_str.len() == 0{
+            true => self.addr.to_owned(),
+            false => format!("{}?{}", self.addr, arg_str)
+        }
+    }
+    pub fn get_ipfs_addr() -> String {
+        format!("http://{}:{}/api/v0", IPFS_ADDR, IPFS_API_PORT)
+    }
+}
 
 pub struct HttpHandler{
-    http_client:Client,
+    http_client:Client<HttpConnector>,
     tokio:Runtime
 }
 impl HttpHandler {
@@ -22,33 +71,72 @@ impl HttpHandler {
         };
     }
     
-    pub async fn send_request(&mut self, options:&CmdOptions) -> Result<Vec<u8>>{
+    pub async fn send_request(&mut self, options:&HttpRequest) -> Result<Vec<u8>>{
         let request_url =  options.get_url();
-        let body = match &options.post_options {
-            Some(post_options) => Bytes::copy_from_slice(post_options.body.as_slice()),
-            None => Bytes::new()
+        println!("{}", (format!("sending get or post request to \"{}\"", request_url).blue()));
+        let mut request_builder = Request::builder()
+            .method(Method::POST)
+            .uri(request_url);
+        let request = match options.post_options.len() {
+            0 | 1 => {
+                for post in options.post_options.iter(){
+                    for (header_key, header_val) in post.headers.iter(){
+                        request_builder = request_builder.header(header_key, header_val)
+                    }
+                }
+                match options.post_options.get(0) {
+                    Some(options) => {
+                        let data = options.body.clone();
+                        request_builder
+                            .header("Content-Type", options.mime_type.to_string())
+                            .body(Body::from(data))?
+                    },
+                    None => request_builder.body(Body::from(Bytes::new()))?
+                }
+            }
+            _ => {
+                let mut body_parts = vec![];
+                for post_options in &options.post_options {
+                    write!(body_parts, "--{}\r\n", HTTP_BOUNDARY)?;
+                    for (header_prop, header_val) in &post_options.headers {
+                        write!(body_parts, "{}:{}; ", header_prop, header_val)?;
+                    }
+                    let data_text = unsafe {
+                        //TODO: find a way to do this safely
+                        std::str::from_utf8_unchecked(post_options.body.as_slice())
+                    };
+                    write!(body_parts, "\r\nContent-Type: {}\r\n", post_options.mime_type)?;
+                    write!(body_parts, "\r\n{}", data_text)?;
+                }
+                write!(body_parts, "--{}--\r\n", HTTP_BOUNDARY)?;
+                request_builder
+                    .header("Content-Type", &*format!("multipart/form-data; boundary={}", HTTP_BOUNDARY))
+                    .body(Body::from(body_parts))?
+            }
         };
-        println!("{}", (format!("sending get or post request to \"{}\"", request_url).green()));
-        let response = self.tokio.block_on(async {
-            self.http_client
-                .post(request_url)
-                .body(body)
-                .send().await
+        let mut response = self.tokio.block_on(async {
+            self.http_client.request(request).await
         })?;
-        let response_bytes = response.bytes().await?;
+        let mut response_data: Vec<u8> = vec![];
+        while let Some(chunk) = response.body_mut().data().await {
+            for byte in chunk? {
+                response_data.push(byte);
+            }
+        }
         println!("response recieved");
-        anyhow::Ok(response_bytes.into())
+        anyhow::Ok(response_data)
+        
     }
-    pub async fn try_send_request<F>(&mut self, options:&CmdOptions, handler_option:Option<F>) -> Result<Vec<u8>>
+    pub async fn try_send_request<F>(&mut self, options:&HttpRequest, handler_option:Option<F>) -> Result<Vec<u8>>
         where F: Fn(Vec<u8>) -> Result<bool>{
-        let mut attempt:u16 = 0;
+        let mut attempt:u32 = 0;
         'attempt_loop: loop {
             attempt += 1;
             if attempt != 1 {
-                std::thread::sleep(Duration::new(get_fibinaci(attempt), 0))
+                std::thread::sleep(Duration::new(math::get_fibinaci(attempt), 0))
             }
             println!("attempting to send post request: attempt {} of {}", attempt, IPFS_RETRY_ATTEMPTS);
-            let is_final_attempt = attempt >= IPFS_RETRY_ATTEMPTS;
+            let is_final_attempt = attempt >= IPFS_RETRY_ATTEMPTS as u32;
             let response_result = self.send_request(options).await;
             let response = match is_final_attempt {
                 true => response_result?,
@@ -71,11 +159,4 @@ impl HttpHandler {
         }
     }
     
-}
-
-fn get_fibinaci(n:u16) -> u64{
-    let phi:f64 = fixed::consts::PHI.to_num();
-    let numerator:f64 = phi.powi(n as i32)-((-phi).powi(n as i32));
-    let denominator:f64 = f64::sqrt(5 as f64);
-    return (numerator/denominator).round() as u64;
 }
