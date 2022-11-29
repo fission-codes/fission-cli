@@ -1,7 +1,6 @@
 use crate::ipfs::Ipfs;
 use crate::utils::*;
 use anyhow::{Result, bail};
-use futures::executor::block_on;
 use super::http::HttpRequest;
 use super::options::*;
 use serde_json::Value;
