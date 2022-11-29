@@ -1,3 +1,7 @@
+pub mod file_management;
+pub mod json;
+pub mod math;
+
 use anyhow::{anyhow, Result};
 use std::io::{self, Write};
 use std::process::Output;
