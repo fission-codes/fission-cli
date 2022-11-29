@@ -119,15 +119,13 @@ impl IpfsViaDaemon {
             let json_seg = res_vec[..(json_seg_end+1)].iter().collect::<String>();
             res = res_vec[(json_seg_end+1)..].iter().collect();
             //convert that segment to json and value
-            // println!("{}", res.yellow());
-            // println!("{}", json_seg.blue());
             let json:Value = serde_json::from_str(&json_seg)?;
             let path = match json.get("Name"){
-                Some(val) => val.to_string(),
+                Some(val) => "/".to_string() + &val.to_string().split("\"").collect::<String>(),
                 None => bail!("Could not find Name property in ipfs's response to an add")
             };
             let hash = match json.get("Hash"){
-                Some(val) => val.to_string(),
+                Some(val) => "/".to_string() + &val.to_string().split("\"").collect::<String>(),
                 None => bail!("Could not find Hash property in ipfs's response to an add")
             };
             ret.insert(path, hash);
@@ -200,7 +198,7 @@ impl Ipfs for IpfsViaDaemon {
     }
 
     async fn connect_to(&mut self, peer_id:&str) -> Result<Vec<String>> {
-        let response = self.swarm_or_bootstrap_cmd("/swarm/connect", peer_id).await?;
+        self.swarm_or_bootstrap_cmd("/swarm/connect", peer_id).await?;
         self.connected_peers.push(peer_id.to_string());
         // print!("Connected Peers: ");
         // self.connected_peers.iter().for_each(|peer| print!("{}, ", peer));
@@ -208,7 +206,7 @@ impl Ipfs for IpfsViaDaemon {
     }
 
     async fn disconect_from(&mut self, peer_id:&str)-> Result<Vec<String>> {
-        let response = self.swarm_or_bootstrap_cmd("/swarm/disconnect", peer_id).await?;
+        self.swarm_or_bootstrap_cmd("/swarm/disconnect", peer_id).await?;
         self.connected_peers = self.connected_peers.iter()
             .filter_map(|peer_id_to_check| {
                 let checkable = peer_id_to_check.to_string();
@@ -324,7 +322,12 @@ mod tests {
             .map(|(path, _)| path)
             .chain(folders.iter())
             .for_each(|path_to_match| {
-                assert!(hashes.iter().any(|(path, _)|path_to_match ==path))
+                let fixed_path_to_match:String = path_to_match
+                    .split("/")
+                    .filter(|seg| seg != &"." && !seg.is_empty())
+                    .map(|seg| "/".to_string() + seg)
+                    .collect();
+                assert!(hashes.iter().any(|(path, _)|fixed_path_to_match == path.to_owned()))
             });
         
         
@@ -339,7 +342,13 @@ mod tests {
         for (path, hash) in &hashes {
             println!("{}: {}", path.green(), hash.blue())
         }
-        assert!(hashes.iter().any(|(path, _)|test_file ==path));
+        let matchable_path:String = test_file
+            .split("/")
+            .filter(|seg| seg != &"." && !seg.is_empty())
+            .map(|seg| "/".to_string() + seg)
+            .collect();
+        println!("{}", matchable_path.red());
+        assert!(hashes.iter().any(|(path, _)|matchable_path == path.to_owned()));
     }
     #[test]
     fn can_config(){
