@@ -125,7 +125,7 @@ impl IpfsViaDaemon {
                 None => bail!("Could not find Name property in ipfs's response to an add")
             };
             let hash = match json.get("Hash"){
-                Some(val) => "/".to_string() + &val.to_string().split("\"").collect::<String>(),
+                Some(val) => val.to_string().split("\"").collect::<String>(),
                 None => bail!("Could not find Hash property in ipfs's response to an add")
             };
             ret.insert(path, hash);
@@ -253,8 +253,6 @@ impl Drop for IpfsViaDaemon {
 
 #[cfg(test)]
 mod tests {
-    use std::hash;
-
     use futures::executor::block_on;
     use crate::utils::file_management;
     // use anyhow::Result;
