@@ -93,7 +93,7 @@ impl IpfsViaDaemon {
     async fn poll_ipfs_ready(&mut self) -> bool{
         let args = HashMap::new();
         let addr =  HttpRequest::get_ipfs_addr() + "/config/show";
-        let cmd = HttpRequest::new(&addr, &args);
+        let cmd = HttpRequest::new(&addr, &args, false);
         let response = self.http.send_request(&cmd).await;
         return match response {
             Ok(_) => true,
@@ -103,12 +103,13 @@ impl IpfsViaDaemon {
             }
         };
     }
+    //TODO: Better name?
     async fn swarm_or_bootstrap_cmd(&mut self, cmd:&str, peer_id:&str) -> Result<Vec<String>>{
         let args = HashMap::from([
             ("arg", peer_id)
         ]);
         let addr = HttpRequest::get_ipfs_addr()+cmd;
-        let cmd_options = HttpRequest::new(&addr, &args);
+        let cmd_options = HttpRequest::new(&addr, &args, false);
         let result_data = self.send_request(&cmd_options).await?;
         let result_str =std::str::from_utf8(result_data.as_slice())?;
         let result_json:Value = match serde_json::from_str(result_str){
@@ -133,22 +134,20 @@ impl IpfsViaDaemon {
 #[async_trait]
 impl Ipfs for IpfsViaDaemon {
     async fn add_file(&mut self, path:&str) -> Result<String> {
-        let name = format!("\"{}\"", file_management::get_name_from_path(path, false));
         let cmd = HttpRequest::get_ipfs_addr()+ "/add";
         let args = HashMap::from([
             ("quieter", "true"),
             ("cid-version", "1"),
             ("path", &path)
         ]);
+        let disposition = format!(" form-data; name=\"files\"; filename=\"{}\"", &path);
         let headers = HashMap::from([
-            // ("Content-Disposition", "form-data"),
-            ("name", &name as &str),
-            ("filename", &path),
-            ("path", &path)
+            ("Content-Disposition", &disposition as &str),
+            ("Content-Type", "application/octet-stream")
         ]);
-        let mut cmd_options = HttpRequest::new(&cmd, &args);
+        let mut cmd_options = HttpRequest::new(&cmd, &args, true);
         let contents = std::fs::read(path)?;
-        cmd_options.add_part(&headers, "application/octet-stream", contents.as_slice());
+        cmd_options.add_body(&headers, contents.as_slice());
         let result_data = self.send_request(&cmd_options).await?;
         let result = std::str::from_utf8(result_data.as_slice())?.to_string();
         return anyhow::Ok(result);
@@ -160,17 +159,17 @@ impl Ipfs for IpfsViaDaemon {
             ("quieter", "true"),
             ("cid-version", "1")
         ]);
-        let mut request = HttpRequest::new(&cmd, &args);
+        let mut request = HttpRequest::new(&cmd, &args, true);
         println!("{}", "Adding the following directories..".blue());
         
         let dirs = file_management::get_dirs_in(path)?;
         for dir in dirs{
-            let name = format!("\"{}\"", file_management::get_name_from_path(path, true));
+            let disposition = format!(" form-data; name=\"files\"; filename=\"{}\"", &dir);
             let headers = HashMap::from([
-                ("Content-Disposition", " form-data: name=\"files\""),
-                ("filename", &name)
+                ("Content-Disposition", &disposition as &str),
+                ("Content-Type", "application/x-directory")
             ]);
-            request.add_part(&headers, "application/x-directory", &[]);
+            request.add_body(&headers, &[]);
             println!("{}", dir.blue());
         }
 
@@ -178,12 +177,12 @@ impl Ipfs for IpfsViaDaemon {
         let files = file_management::get_files_in(path)?;
 
         for (file_path, data) in files {
-            let name = format!("\"{}\"", file_management::get_name_from_path(path, true));
+            let disposition = format!(" form-data; name=\"files\"; filename=\"{}\"", &file_path);
             let headers = HashMap::from([
-                ("Content-Disposition", " form-data: name=\"files\""),
-                ("filename", &file_path)
+                ("Content-Disposition", &disposition as &str),
+                ("Content-Type", "application/octet-stream")
             ]);
-            request.add_part(&headers, "application/octet-stream", data.as_slice());
+            request.add_body(&headers, data.as_slice());
             println!("{}", file_path.blue());
 
         }
@@ -237,7 +236,7 @@ impl Ipfs for IpfsViaDaemon {
                 ("arg", &value)
             ]);
             let addr = HttpRequest::get_ipfs_addr()+"config";
-            let cmd_options = HttpRequest::new(&addr, &args);
+            let cmd_options = HttpRequest::new(&addr, &args, false);
             self.send_request(&cmd_options).await?;
         }
         anyhow::Ok(())
@@ -259,8 +258,9 @@ impl Drop for IpfsViaDaemon {
 #[cfg(test)]
 mod tests {
     use futures::executor::block_on;
-    use anyhow::Result;
-    use proptest::prelude::*;
+    use crate::utils::file_management;
+    // use anyhow::Result;
+    // use proptest::prelude::*;
     use super::*;
 
     //TODO: Setup pizza 
@@ -305,11 +305,32 @@ mod tests {
     // }
     #[test]
     fn can_add_directory(){
-        let testdir = "./test-dir";
+        let test_dir = "./test-dir";
         let mut ipfs = connect_to_peers();
-        let res = block_on(ipfs.add_directory(testdir)).unwrap();
+        let res = block_on(ipfs.add_directory(test_dir)).unwrap();
         println!("Server responded with:\n {}", res.green());
-        assert!(true);
+
+        let files = file_management::get_files_in(test_dir).unwrap();
+        let folders = file_management::get_dirs_in(test_dir).unwrap();
+
+        files.iter()
+            .map(|(path, _)| path)
+            .chain(folders.iter())
+            .for_each(|path| {
+                //This removes the "./" at the begginning of paths as the ipfs server responds without them
+                let fixed_path:String = path
+                    .split("/")
+                    .enumerate()
+                    .filter_map(|(i, seg)| {
+                        match i {
+                            0 => None,
+                            1 => Some(seg.to_string()),
+                            _ => Some("/".to_string() + seg)
+                        }
+                    }).collect();
+                println!("checking if response contains path {}", fixed_path);
+                assert!(res.contains(&fixed_path));
+            });
     }
     // #[test]
     // fn can_add_file(){
