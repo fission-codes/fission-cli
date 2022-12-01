@@ -220,28 +220,50 @@ impl Ipfs for IpfsViaDaemon {
         anyhow::Ok(self.connected_peers.clone())
     }
 
-    async fn config(&mut self, options:HashMap<String, String>) -> Result<()> {
+    async fn config(&mut self, options:&HashMap<&str, &str>) -> Result<()> {
+        let get_profile = HttpRequest::new(&(HttpRequest::get_ipfs_addr()+"/config/show"), &(HashMap::new()), false);
+        let profile_vec = self.send_request(&get_profile).await?;
+        let profile_str = std::str::from_utf8(profile_vec.as_slice())?;
+        let mut profile:Value = serde_json::from_str(profile_str)?;
         for (setting, value) in options {
-            let cleaned_value = value.to_lowercase();
-            let is_bool = match cleaned_value.trim() == "true" || cleaned_value.trim() == "false" {
-                true => "true",
-                false => "false"
+            let number_value = value.to_string().parse::<f64>();
+            let bool_value = value.to_string().parse::<bool>();
+            let json_value = serde_json::from_str::<Value>(value);
+            let value_parsed = match number_value {
+                Ok(v) => Value::Number(serde_json::Number::from_f64(v).unwrap()),
+                Err(_) => {
+                    match bool_value {
+                        Ok(v) => Value::Bool(v),
+                        Err(_) => {
+                            match json_value {
+                                Ok(v) => v,
+                                Err(_) => Value::String(value.to_string())
+                            }
+                        }
+                    }
+                }
             };
-            let is_json = match serde_json::from_str::<Value>(&value).is_ok() {
-                true => "true",
-                false => "false"
-            };
-            let args = HashMap::from([
-                ("bool", is_bool),
-                ("json", is_json),
-                ("arg", &setting),
-                ("arg", &value)
-            ]);
-            let addr = HttpRequest::get_ipfs_addr()+"config";
-            let cmd_options = HttpRequest::new(&addr, &args, false);
-            self.send_request(&cmd_options).await?;
+            let location = setting.split(".").map(|s| s.to_string());
+            profile = json::change_json_part(&profile, location, &value_parsed)?;
         }
-        anyhow::Ok(())
+        let json_str = profile.to_string();
+        
+        let args = HashMap::new();
+        let headers = HashMap::from([
+            ("Content-Disposition"," form-data; name=\"files\"; filename=\"config\""),
+            ("Content-Type", "application/octet-stream")
+        ]);
+
+        let addr = HttpRequest::get_ipfs_addr()+"/config/replace";
+        let mut request = HttpRequest::new(&addr, &args, true);
+        request.add_body(&headers, json_str.as_bytes());
+        let response = self.send_request(&request).await?;
+        let res_str = std::str::from_utf8(response.as_slice())?;
+        if res_str.trim().is_empty(){
+            return anyhow::Ok(())
+        }else{
+            bail!("There was error changing the settings in ipfs. The failure was: {}", res_str.red());
+        }
     }
 }
 impl Drop for IpfsViaDaemon {
@@ -255,6 +277,7 @@ impl Drop for IpfsViaDaemon {
 mod tests {
     use futures::executor::block_on;
     use crate::utils::file_management;
+    use std::collections::HashMap;
     // use anyhow::Result;
     // use proptest::prelude::*;
     use super::*;
@@ -288,20 +311,6 @@ mod tests {
         return ipfs;
     }
 
-    // #[test]
-    // fn can_connect(){
-    //     connect_to_peers();
-    //     assert!(true);
-    // }
-    // proptest! {
-    //     #[test]
-    //     #[serial]
-    //     fn can_add_file(s: &str){
-    //         let mut ipfs = connect_to_peers();
-    //         ipf.add_file()
-    //         assert!(true);
-    //     }
-    // }
     #[test]
     #[serial]
     fn can_add_directory(){
@@ -345,11 +354,20 @@ mod tests {
             .filter(|seg| seg != &"." && !seg.is_empty())
             .map(|seg| "/".to_string() + seg)
             .collect();
-        println!("{}", matchable_path.red());
         assert!(hashes.iter().any(|(path, _)|matchable_path == path.to_owned()));
     }
     #[test]
+    #[serial]
     fn can_config(){
-
+        let mut ipfs = IpfsViaDaemon::new().unwrap();
+        block_on(ipfs.config(&HashMap::from([
+            ("Datastore.StorageMax", "11GB"),
+            ("Datastore.GCPeriod", "2h")
+        ]))).unwrap();
+        block_on(ipfs.config(&HashMap::from([
+            ("Datastore.StorageMax", "10GB"),
+            ("Datastore.GCPeriod", "1h")
+        ]))).unwrap();
+        assert!(true)
     }
 }
