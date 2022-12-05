@@ -6,6 +6,7 @@ use crate::utils::*;
 use anyhow::{bail, Result};
 use async_trait::async_trait;
 use colored::Colorize;
+use futures::executor::block_on;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::process::{Child, Command};
@@ -288,6 +289,9 @@ impl Ipfs for IpfsViaDaemon {
 }
 impl Drop for IpfsViaDaemon {
     fn drop(&mut self) {
+        for peer in self.connected_peers.clone().iter() {
+            block_on(self.disconect_from(peer)).unwrap();
+        }
         self.ipfs_process.kill().unwrap();
         println!(
             "{}",
