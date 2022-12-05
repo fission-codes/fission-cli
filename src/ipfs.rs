@@ -8,6 +8,7 @@ use anyhow::Result;
 pub mod daemon;
 pub mod http;
 pub mod options;
+pub mod config;
 
 #[async_trait]
 pub trait Ipfs {

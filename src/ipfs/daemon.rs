@@ -247,7 +247,7 @@ impl Ipfs for IpfsViaDaemon {
             profile = json::change_json_part(&profile, location, &value_parsed)?;
         }
         let json_str = profile.to_string();
-        
+        println!("{}", json_str.red());
         let args = HashMap::new();
         let headers = HashMap::from([
             ("Content-Disposition"," form-data; name=\"files\"; filename=\"config\""),
