@@ -96,7 +96,7 @@ impl IpfsViaDaemon {
         };
     }
     //TODO: Better name?
-    async fn swarm_or_bootstrap_cmd(&mut self, cmd: &str, peer_id: &str) -> Result<Vec<String>> {
+    async fn swarm_cmd(&mut self, cmd: &str, peer_id: &str) -> Result<Vec<String>> {
         let args = HashMap::from([("arg", peer_id)]);
         let addr = HttpRequest::get_ipfs_addr() + cmd;
         let cmd_options = HttpRequest::new(&addr, &args, false);
@@ -201,12 +201,8 @@ impl Ipfs for IpfsViaDaemon {
         anyhow::Ok(hashes)
     }
 
-    async fn add_bootstrap(&mut self, peer_id: &str) -> Result<Vec<String>> {
-        self.swarm_or_bootstrap_cmd("/bootstrap/add", peer_id).await
-    }
-
     async fn connect_to(&mut self, peer_id: &str) -> Result<Vec<String>> {
-        self.swarm_or_bootstrap_cmd("/swarm/connect", peer_id)
+        self.swarm_cmd("/swarm/connect", peer_id)
             .await?;
         self.connected_peers.push(peer_id.to_string());
         // print!("Connected Peers: ");
@@ -215,7 +211,7 @@ impl Ipfs for IpfsViaDaemon {
     }
 
     async fn disconect_from(&mut self, peer_id: &str) -> Result<Vec<String>> {
-        self.swarm_or_bootstrap_cmd("/swarm/disconnect", peer_id)
+        self.swarm_cmd("/swarm/disconnect", peer_id)
             .await?;
         self.connected_peers = self
             .connected_peers
