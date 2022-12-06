@@ -6,7 +6,6 @@ use async_trait::async_trait;
 use self::config::Config;
 
 pub mod daemon;
-pub mod http;
 pub mod config;
 
 #[cfg(test)]

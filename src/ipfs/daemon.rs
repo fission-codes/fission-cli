@@ -12,10 +12,15 @@ use serde_json::Value;
 
 use crate::ipfs::{
     config::Config,
-    http::{HttpHandler, HttpRequest},
     Ipfs
 };
-use crate::utils::*;
+
+use crate::utils::{
+    config::{IPFS_BOOT_TIME_OUT, IPFS_ADDR, IPFS_API_PORT, IPFS_EXE, IPFS_SLEEP_LENGTH},
+    file_management,
+    http::{HttpHandler, HttpRequest},
+    json
+};
 
 
 pub struct IpfsDaemon {
@@ -26,8 +31,8 @@ pub struct IpfsDaemon {
 impl IpfsDaemon {
     pub fn new() -> Result<IpfsDaemon> {
         println!("{}", "Starting ipfs...".green());
-        let api_addr = format!("/ip4/{}/tcp/{}", config::IPFS_ADDR, config::IPFS_API_PORT);
-        let proccess = Command::new(config::IPFS_EXE)
+        let api_addr = format!("/ip4/{}/tcp/{}", IPFS_ADDR, IPFS_API_PORT);
+        let proccess = Command::new(IPFS_EXE)
         .arg("--api")
         .arg(&api_addr)
         .arg("daemon")
@@ -73,10 +78,10 @@ impl IpfsDaemon {
                 break;
             }
 
-            sleep(Duration::new(config::SLEEP_LENGTH as u64, 0));
+            sleep(Duration::new(IPFS_SLEEP_LENGTH as u64, 0));
 
             let now = SystemTime::now();
-            if now.duration_since(start_time)? > Duration::new(config::BOOT_TIME_OUT as u64, 0) {
+            if now.duration_since(start_time)? > Duration::new(IPFS_BOOT_TIME_OUT as u64, 0) {
                 bail!(
                     "{}",
                     "Failed to start ipfs because the timeout reached!!".red()
@@ -87,7 +92,7 @@ impl IpfsDaemon {
     }
     async fn poll_ipfs_ready(&mut self) -> bool {
         let args = HashMap::new();
-        let addr = HttpRequest::get_ipfs_addr() + "/config/show";
+        let addr = Self::get_ipfs_addr() + "/config/show";
         let cmd = HttpRequest::new(&addr, &args, false);
         let response = self.http.send_request(&cmd).await;
         return match response {
@@ -101,7 +106,7 @@ impl IpfsDaemon {
     //TODO: Better name?
     async fn swarm_cmd(&mut self, cmd: &str, peer_id: &str) -> Result<Vec<String>> {
         let args = HashMap::from([("arg", peer_id)]);
-        let addr = HttpRequest::get_ipfs_addr() + cmd;
+        let addr = Self::get_ipfs_addr() + cmd;
         let cmd_options = HttpRequest::new(&addr, &args, false);
         let result_data = self.send_request(&cmd_options).await?;
         let result_str = std::str::from_utf8(result_data.as_slice())?;
@@ -149,11 +154,15 @@ impl IpfsDaemon {
             ret.insert(path, hash);
         };
     }
+
+    fn get_ipfs_addr() -> String {
+        format!("http://{}:{}/api/v0", IPFS_ADDR, IPFS_API_PORT)
+    }
 }
 #[async_trait]
 impl Ipfs for IpfsDaemon {
     async fn add_file(&mut self, path: &str) -> Result<HashMap<String, String>> {
-        let cmd = HttpRequest::get_ipfs_addr() + "/add";
+        let cmd = Self::get_ipfs_addr() + "/add";
         let args = HashMap::from([("quieter", "true"), ("cid-version", "1"), ("path", &path)]);
         let disposition = format!(" form-data; name=\"files\"; filename=\"{}\"", &path);
         let headers = HashMap::from([
@@ -170,7 +179,7 @@ impl Ipfs for IpfsDaemon {
     }
 
     async fn add_directory(&mut self, path: &str) -> Result<HashMap<String, String>> {
-        let cmd = HttpRequest::get_ipfs_addr() + "/add";
+        let cmd = Self::get_ipfs_addr() + "/add";
         let args = HashMap::from([("quieter", "true"), ("cid-version", "1")]);
         let mut request = HttpRequest::new(&cmd, &args, true);
         println!("{}", "Adding the following directories..".blue());
@@ -213,7 +222,7 @@ impl Ipfs for IpfsDaemon {
     }
     async fn get_config(&mut self) -> Result<Config>{
         let get_profile = HttpRequest::new(
-            &(HttpRequest::get_ipfs_addr() + "/config/show"),
+            &(Self::get_ipfs_addr() + "/config/show"),
             &(HashMap::new()),
             false,
         );
@@ -224,7 +233,7 @@ impl Ipfs for IpfsDaemon {
     }
     async fn set_config(&mut self, options: &Config) -> Result<()> {
         let args = HashMap::new();
-        let addr = HttpRequest::get_ipfs_addr() + "/config/replace";
+        let addr = Self::get_ipfs_addr() + "/config/replace";
         let mut request = HttpRequest::new(&addr, &args, true);
         let headers = HashMap::from([
             (

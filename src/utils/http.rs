@@ -55,9 +55,6 @@ impl HttpRequest {
             false => format!("{}?{}", self.addr, arg_str)
         }
     }
-    pub fn get_ipfs_addr() -> String {
-        format!("http://{}:{}/api/v0", IPFS_ADDR, IPFS_API_PORT)
-    }
 }
 
 pub struct HttpHandler{
