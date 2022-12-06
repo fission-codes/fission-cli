@@ -1,8 +1,8 @@
-
-use walkdir::WalkDir;
 use std::collections::HashMap;
+
 use anyhow::{Result, bail};
 use colored::Colorize;
+use walkdir::WalkDir;
 
 //TODO: This needs to move to utils
 pub fn get_files_in(dir:&str) -> Result<HashMap<String, Vec<u8>>> {

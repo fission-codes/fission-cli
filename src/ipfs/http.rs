@@ -13,9 +13,11 @@ use hyper::{
     client::HttpConnector,
     body::HttpBody
 };
-use crate::utils::math;
 
-use super::options::*;
+use crate::utils::{
+    config::*,
+    math
+};
 
 
 pub struct PostOptions {
@@ -135,7 +137,7 @@ impl HttpHandler {
         'attempt_loop: loop {
             attempt += 1;
             if attempt != 1 {
-                std::thread::sleep(Duration::new(math::get_fibinaci(attempt), 0))
+                std::thread::sleep(Duration::new(math::get_fibonacci(attempt), 0))
             }
             println!("attempting to send post request: attempt {} of {}", attempt, IPFS_RETRY_ATTEMPTS);
             let is_final_attempt = attempt >= IPFS_RETRY_ATTEMPTS as u32;

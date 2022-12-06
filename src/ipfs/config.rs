@@ -91,6 +91,8 @@ pub struct Config{
 
 
 /*
+Example IPFS Config
+
 {
    "API":{
       "HTTPHeaders":{

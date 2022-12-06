@@ -1,17 +1,22 @@
-use super::http::HttpRequest;
-use super::options::*;
-use crate::ipfs::config::Config;
-use crate::ipfs::http::HttpHandler;
-use crate::ipfs::Ipfs;
-use crate::utils::*;
+use std::{
+    collections::HashMap,
+    process::{Child, Command},
+    thread::sleep,
+    time::{Duration, SystemTime}
+};
+
 use anyhow::{bail, Result};
 use async_trait::async_trait;
 use colored::Colorize;
 use serde_json::Value;
-use std::collections::HashMap;
-use std::process::{Child, Command};
-use std::thread::sleep;
-use std::time::{Duration, SystemTime};
+
+use crate::ipfs::{
+    config::Config,
+    http::{HttpHandler, HttpRequest},
+    Ipfs
+};
+use crate::utils::*;
+
 
 pub struct IpfsViaDaemon {
     http: HttpHandler,
@@ -21,8 +26,8 @@ pub struct IpfsViaDaemon {
 impl IpfsViaDaemon {
     pub fn new() -> Result<IpfsViaDaemon> {
         println!("{}", "Starting ipfs...".green());
-        let api_addr = format!("/ip4/{}/tcp/{}", IPFS_ADDR, IPFS_API_PORT);
-        let proccess = Command::new(IPFS_EXE)
+        let api_addr = format!("/ip4/{}/tcp/{}", config::IPFS_ADDR, config::IPFS_API_PORT);
+        let proccess = Command::new(config::IPFS_EXE)
         .arg("--api")
         .arg(&api_addr)
         .arg("daemon")
@@ -68,10 +73,10 @@ impl IpfsViaDaemon {
                 break;
             }
 
-            sleep(Duration::new(SLEEP_LENGTH as u64, 0));
+            sleep(Duration::new(config::SLEEP_LENGTH as u64, 0));
 
             let now = SystemTime::now();
-            if now.duration_since(start_time)? > Duration::new(BOOT_TIME_OUT as u64, 0) {
+            if now.duration_since(start_time)? > Duration::new(config::BOOT_TIME_OUT as u64, 0) {
                 bail!(
                     "{}",
                     "Failed to start ipfs because the timeout reached!!".red()

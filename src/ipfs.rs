@@ -1,15 +1,12 @@
-//use std::collections::{HashMap, btree_map::OccupiedError};
-
-use async_trait::async_trait;
 use std::collections::HashMap;
 
 use anyhow::Result;
+use async_trait::async_trait;
 
 use self::config::Config;
 
 pub mod daemon;
 pub mod http;
-pub mod options;
 pub mod config;
 
 #[async_trait]
