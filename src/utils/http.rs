@@ -24,12 +24,14 @@ pub struct PostOptions {
     pub headers:HashMap<String, String>,
     pub body: Vec<u8>
 }
+
 pub struct HttpRequest {
     pub addr: String,
     pub args: HashMap<String, String>,
     pub is_multipart:bool,
     post_options: Vec<PostOptions>//TODO: Better name?
 }
+
 impl HttpRequest {
     pub fn new(addr: &str, args: &HashMap<&str, &str>, is_multipart:bool) -> Self{
         let owned_args:HashMap<String, String> = args.iter()
@@ -61,6 +63,7 @@ pub struct HttpHandler{
     http_client:Client<HttpConnector>,
     tokio:Runtime
 }
+
 impl HttpHandler {
     pub fn new() -> HttpHandler{
         let client = Client::new();
@@ -128,6 +131,7 @@ impl HttpHandler {
         anyhow::Ok(response_data)
         
     }
+
     pub async fn try_send_request<F>(&mut self, options:&HttpRequest, handler_option:Option<F>) -> Result<Vec<u8>>
         where F: Fn(Vec<u8>) -> Result<bool>{
         let mut attempt:u32 = 0;

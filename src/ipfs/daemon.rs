@@ -28,6 +28,7 @@ pub struct IpfsDaemon {
     ipfs_process: Child,
     is_ipfs_ready: bool
 }
+
 impl IpfsDaemon {
     pub fn new() -> Result<IpfsDaemon> {
         println!("{}", "Starting ipfs...".green());
@@ -49,6 +50,7 @@ impl IpfsDaemon {
             is_ipfs_ready: false
         })
     }
+    
     async fn send_request(&mut self, options: &HttpRequest) -> Result<Vec<u8>> {
         self.await_ready().await?;
         let result = self
@@ -64,6 +66,7 @@ impl IpfsDaemon {
             .await?;
         anyhow::Ok(result) //it always return Some if a handler is given
     }
+
     async fn await_ready(&mut self) -> Result<()> {
         if self.is_ipfs_ready == true {
             return anyhow::Ok(());
@@ -90,6 +93,7 @@ impl IpfsDaemon {
         }
         anyhow::Ok(())
     }
+
     async fn poll_ipfs_ready(&mut self) -> bool {
         let args = HashMap::new();
         let addr = Self::get_ipfs_addr() + "/config/show";
@@ -103,6 +107,7 @@ impl IpfsDaemon {
             }
         };
     }
+
     //TODO: Better name?
     async fn swarm_cmd(&mut self, cmd: &str, peer_id: &str) -> Result<Vec<String>> {
         let args = HashMap::from([("arg", peer_id)]);
@@ -128,6 +133,7 @@ impl IpfsDaemon {
 
         return anyhow::Ok(peer_list);
     }
+
     fn response_to_hashes(response: &str) -> Result<HashMap<String, String>> {
         let mut res = response.to_string();
         let mut ret = HashMap::new();
@@ -159,6 +165,7 @@ impl IpfsDaemon {
         format!("http://{}:{}/api/v0", IPFS_ADDR, IPFS_API_PORT)
     }
 }
+
 #[async_trait]
 impl Ipfs for IpfsDaemon {
     async fn add_file(&mut self, path: &str) -> Result<HashMap<String, String>> {
@@ -220,6 +227,7 @@ impl Ipfs for IpfsDaemon {
         // self.connected_peers.iter().for_each(|peer| print!("{}, ", peer));
         anyhow::Ok(())
     }
+
     async fn get_config(&mut self) -> Result<Config>{
         let get_profile = HttpRequest::new(
             &(Self::get_ipfs_addr() + "/config/show"),
@@ -231,6 +239,7 @@ impl Ipfs for IpfsDaemon {
         // println!("{}", profile_str.red());
         return Ok(serde_json::from_str(profile_str)?);
     }
+
     async fn set_config(&mut self, options: &Config) -> Result<()> {
         let args = HashMap::new();
         let addr = Self::get_ipfs_addr() + "/config/replace";
@@ -256,6 +265,7 @@ impl Ipfs for IpfsDaemon {
         }
     }
 }
+
 impl Drop for IpfsDaemon {
     fn drop(&mut self) {
         self.ipfs_process.kill().unwrap();
