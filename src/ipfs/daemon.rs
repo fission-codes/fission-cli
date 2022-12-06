@@ -18,13 +18,13 @@ use crate::ipfs::{
 use crate::utils::*;
 
 
-pub struct IpfsViaDaemon {
+pub struct IpfsDaemon {
     http: HttpHandler,
     ipfs_process: Child,
     is_ipfs_ready: bool
 }
-impl IpfsViaDaemon {
-    pub fn new() -> Result<IpfsViaDaemon> {
+impl IpfsDaemon {
+    pub fn new() -> Result<IpfsDaemon> {
         println!("{}", "Starting ipfs...".green());
         let api_addr = format!("/ip4/{}/tcp/{}", config::IPFS_ADDR, config::IPFS_API_PORT);
         let proccess = Command::new(config::IPFS_EXE)
@@ -38,7 +38,7 @@ impl IpfsViaDaemon {
             "{}",
             ("⚠️ Warning: Ipfs Proccess Started. Please do NOT force close this app⚠️".yellow())
         );
-        anyhow::Ok(IpfsViaDaemon {
+        anyhow::Ok(IpfsDaemon {
             ipfs_process: proccess,
             http: HttpHandler::new(),
             is_ipfs_ready: false
@@ -151,7 +151,7 @@ impl IpfsViaDaemon {
     }
 }
 #[async_trait]
-impl Ipfs for IpfsViaDaemon {
+impl Ipfs for IpfsDaemon {
     async fn add_file(&mut self, path: &str) -> Result<HashMap<String, String>> {
         let cmd = HttpRequest::get_ipfs_addr() + "/add";
         let args = HashMap::from([("quieter", "true"), ("cid-version", "1"), ("path", &path)]);
@@ -246,7 +246,7 @@ impl Ipfs for IpfsViaDaemon {
         }
     }
 }
-impl Drop for IpfsViaDaemon {
+impl Drop for IpfsDaemon {
     fn drop(&mut self) {
         self.ipfs_process.kill().unwrap();
         println!(
@@ -286,8 +286,8 @@ mod tests {
         "/dns4/production-ipfs-cluster-us-east-1-node1.runfission.com/tcp/4003/wss/p2p/12D3KooWNntMEXRUa2dNgkQsVgzao6zGSYxm1oAs83YtRy6uBuxv",
     ];
 
-    fn connect_to_peers() -> IpfsViaDaemon {
-        let mut ipfs = IpfsViaDaemon::new().unwrap();
+    fn connect_to_peers() -> IpfsDaemon {
+        let mut ipfs = IpfsDaemon::new().unwrap();
         for peer in PEER_ADDRS {
             block_on(ipfs.connect_to(peer)).unwrap();
             println!("Connected to peer! {}", peer);
@@ -346,7 +346,7 @@ mod tests {
     #[test]
     #[serial]
     fn can_config() {
-        let mut ipfs = IpfsViaDaemon::new().unwrap();
+        let mut ipfs = IpfsDaemon::new().unwrap();
         let mut config = block_on(ipfs.get_config()).unwrap();
         config.datastore.as_object_mut().unwrap().insert("StorageMax".to_string(), Value::String("11GB".to_string()));
         config.datastore.as_object_mut().unwrap().insert("GCPeriod".to_string(), Value::String("2h".to_string()));
