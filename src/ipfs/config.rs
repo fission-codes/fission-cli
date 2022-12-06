@@ -1,44 +1,74 @@
+pub mod Identity;
+pub mod Datastore;
+pub mod Mounts;
+pub mod Discovery;
+pub mod Routing;
+pub mod Ipns;
+pub mod Gateway;
+pub mod Swarm;
+pub mod Pubsub;
+pub mod Peering;
+pub mod DNS;
+pub mod Migration;
+pub mod Provider;
+pub mod Reprovider;
+pub mod Experimental;
+pub mod Plugins;
+pub mod Pinning;
+pub mod API;
+pub mod Addresses;
+pub mod AutoNAT;
+
 use serde::{Serialize, Deserialize};
 
 #[derive(Clone, Debug, Serialize,  Deserialize)]
 pub struct Config{
+    #[serde(alias = "Identity")]
+    identity:Identity::Identity,
+    #[serde(alias = "Datastore")]
+    datastore:Datastore::Datastore,
+    #[serde(alias = "Mounts")]
+    mounts:Mounts::Mounts,
+    #[serde(alias = "Discovery")]
+    discovery:Discovery::Discovery,
+    #[serde(alias = "Routing")]
+    routing:Routing::Routing,
+    #[serde(alias = "Ipns")]
+    ipns:Ipns::Ipns,
+    #[serde(alias = "Gateway")]
+    gateway:Gateway::Gateway,
+    #[serde(alias = "Swarm")]
+    swarm:Swarm::Swarm,
+    #[serde(alias = "Pubsub")]
+    pubsub:Pubsub::Pubsub,
+    #[serde(alias = "Peering")]
+    peering:Peering::Peering,
+    #[serde(alias = "DNS")]
+    dns:DNS::DNS,
+    #[serde(alias = "Migration")]
+    migration:Migration::Migration,
+    #[serde(alias = "Provider")]
+    provider:Provider::Provider,
+    #[serde(alias = "Reprovider")]
+    reprovider:Reprovider::Reprovider,
+    #[serde(alias = "Experimental")]
+    experimental:Experimental::Experimental,
+    #[serde(alias = "Plugins")]
+    plugins:Plugins::Plugins,
+    #[serde(alias = "Pinning")]
+    pinning:Pinning::Pinning,
     #[serde(alias = "API")]
-    api:API,
+    api:API::API,
     #[serde(alias = "Addresses")]
-    addresses:Addresses,
+    addresses:Addresses::Addresses,
     #[serde(alias = "AutoNAT")]
-    auto_nat:AutoNAT,
+    auto_nat:AutoNAT::AutoNAT,
     #[serde(alias = "Bootstrap")]
     bootstrap:Vec<String>
 }
-#[derive(Clone, Debug, Serialize,  Deserialize)]
-pub struct API{
-    #[serde(alias = "HTTPHeaders")]
-    http_headers:HttpHeaders,
-}
-#[derive(Clone, Debug, Serialize,  Deserialize)]
-pub struct HttpHeaders{
 
-}
-#[derive(Clone, Debug, Serialize,  Deserialize)]
-pub struct Addresses{
-    #[serde(alias = "API")]
-    api:String,
-    #[serde(alias = "Announce")]
-    announce:Vec<String>,
-    #[serde(alias = "AppendAnnounce")]
-    append_announce:Vec<String>,
-    #[serde(alias = "Gateway")]
-    gateway:String,
-    #[serde(alias = "NoAnounce")]
-    no_anounce:Vec<String>,
-    #[serde(alias = "Swarm")]
-    swarm:Vec<String>
-}
-#[derive(Clone, Debug, Serialize,  Deserialize)]
-pub struct AutoNAT{
 
-}
+
 /*
 {
    "API":{
