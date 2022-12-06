@@ -219,6 +219,7 @@ impl Ipfs for IpfsDaemon {
         );
         let profile_vec = self.send_request(&get_profile).await?;
         let profile_str = std::str::from_utf8(profile_vec.as_slice())?;
+        // println!("{}", profile_str.red());
         return Ok(serde_json::from_str(profile_str)?);
     }
     async fn set_config(&mut self, options: &Config) -> Result<()> {

@@ -10,13 +10,13 @@ pub struct Addresses{
     announce:Vec<String>,
     #[serde(default)]
     #[serde(alias = "AppendAnnounce")]
-    append_announce:Vec<String>,
+    append_announce:Option<Vec<String>>,
     #[serde(default)]
     #[serde(alias = "Gateway")]
     gateway:String,
     #[serde(default)]
     #[serde(alias = "NoAnounce")]
-    no_anounce:Vec<String>,
+    no_anounce:Option<Vec<String>>,
     #[serde(default)]
     #[serde(alias = "Swarm")]
     swarm:Vec<String>
