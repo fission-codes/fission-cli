@@ -9,6 +9,9 @@ pub mod daemon;
 pub mod http;
 pub mod config;
 
+#[cfg(test)]
+pub mod tests;
+
 #[async_trait]
 pub trait Ipfs {
     async fn add_file(&mut self, path:&str) -> Result<HashMap<String, String>>;
