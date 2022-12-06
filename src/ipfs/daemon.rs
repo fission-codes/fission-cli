@@ -1,12 +1,12 @@
 use super::http::HttpRequest;
 use super::options::*;
+use crate::ipfs::config::Config;
 use crate::ipfs::http::HttpHandler;
 use crate::ipfs::Ipfs;
 use crate::utils::*;
 use anyhow::{bail, Result};
 use async_trait::async_trait;
 use colored::Colorize;
-use futures::executor::block_on;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::process::{Child, Command};
@@ -16,8 +16,7 @@ use std::time::{Duration, SystemTime};
 pub struct IpfsViaDaemon {
     http: HttpHandler,
     ipfs_process: Child,
-    is_ipfs_ready: bool,
-    connected_peers: Vec<String>,
+    is_ipfs_ready: bool
 }
 impl IpfsViaDaemon {
     pub fn new() -> Result<IpfsViaDaemon> {
@@ -37,8 +36,7 @@ impl IpfsViaDaemon {
         anyhow::Ok(IpfsViaDaemon {
             ipfs_process: proccess,
             http: HttpHandler::new(),
-            is_ipfs_ready: false,
-            connected_peers: vec![],
+            is_ipfs_ready: false
         })
     }
     async fn send_request(&mut self, options: &HttpRequest) -> Result<Vec<u8>> {
@@ -201,37 +199,14 @@ impl Ipfs for IpfsViaDaemon {
         anyhow::Ok(hashes)
     }
 
-    async fn connect_to(&mut self, peer_id: &str) -> Result<Vec<String>> {
+    async fn connect_to(&mut self, peer_id: &str) -> Result<()> {
         self.swarm_cmd("/swarm/connect", peer_id)
             .await?;
-        self.connected_peers.push(peer_id.to_string());
         // print!("Connected Peers: ");
         // self.connected_peers.iter().for_each(|peer| print!("{}, ", peer));
-        anyhow::Ok(self.connected_peers.clone())
+        anyhow::Ok(())
     }
-
-    async fn disconect_from(&mut self, peer_id: &str) -> Result<Vec<String>> {
-        self.swarm_cmd("/swarm/disconnect", peer_id)
-            .await?;
-        self.connected_peers = self
-            .connected_peers
-            .iter()
-            .filter_map(|peer_id_to_check| {
-                let checkable = peer_id_to_check.to_string();
-                match peer_id != checkable {
-                    true => Some(checkable),
-                    false => None,
-                }
-            })
-            .collect();
-        print!("Connected Peers: ");
-        self.connected_peers
-            .iter()
-            .for_each(|peer| print!("{}, ", peer));
-        anyhow::Ok(self.connected_peers.clone())
-    }
-
-    async fn config(&mut self, options: &HashMap<&str, &str>) -> Result<()> {
+    async fn get_config(&mut self) -> Result<Config>{
         let get_profile = HttpRequest::new(
             &(HttpRequest::get_ipfs_addr() + "/config/show"),
             &(HashMap::new()),
@@ -239,27 +214,12 @@ impl Ipfs for IpfsViaDaemon {
         );
         let profile_vec = self.send_request(&get_profile).await?;
         let profile_str = std::str::from_utf8(profile_vec.as_slice())?;
-        let mut profile: Value = serde_json::from_str(profile_str)?;
-        for (setting, value) in options {
-            let number_value = value.to_string().parse::<f64>();
-            let bool_value = value.to_string().parse::<bool>();
-            let json_value = serde_json::from_str::<Value>(value);
-            let value_parsed = match number_value {
-                Ok(v) => Value::Number(serde_json::Number::from_f64(v).unwrap()),
-                Err(_) => match bool_value {
-                    Ok(v) => Value::Bool(v),
-                    Err(_) => match json_value {
-                        Ok(v) => v,
-                        Err(_) => Value::String(value.to_string()),
-                    },
-                },
-            };
-            let location = setting.split(".").map(|s| s.to_string());
-            profile = json::change_json_part(&profile, location, &value_parsed)?;
-        }
-        let json_str = profile.to_string();
-        println!("{}", json_str.red());
+        return Ok(serde_json::from_str(profile_str)?);
+    }
+    async fn set_config(&mut self, options: &Config) -> Result<()> {
         let args = HashMap::new();
+        let addr = HttpRequest::get_ipfs_addr() + "/config/replace";
+        let mut request = HttpRequest::new(&addr, &args, true);
         let headers = HashMap::from([
             (
                 "Content-Disposition",
@@ -267,10 +227,8 @@ impl Ipfs for IpfsViaDaemon {
             ),
             ("Content-Type", "application/octet-stream"),
         ]);
-
-        let addr = HttpRequest::get_ipfs_addr() + "/config/replace";
-        let mut request = HttpRequest::new(&addr, &args, true);
-        request.add_body(&headers, json_str.as_bytes());
+        let body = serde_json::to_string(options)?;
+        request.add_body(&headers, body.as_bytes());
         let response = self.send_request(&request).await?;
         let res_str = std::str::from_utf8(response.as_slice())?;
         if res_str.trim().is_empty() {
@@ -285,9 +243,6 @@ impl Ipfs for IpfsViaDaemon {
 }
 impl Drop for IpfsViaDaemon {
     fn drop(&mut self) {
-        for peer in self.connected_peers.clone().iter() {
-            block_on(self.disconect_from(peer)).unwrap();
-        }
         self.ipfs_process.kill().unwrap();
         println!(
             "{}",
@@ -300,12 +255,14 @@ impl Drop for IpfsViaDaemon {
 #[cfg(test)]
 mod tests {
     use crate::utils::file_management;
+    use crate::ipfs::{Config, config};
     use futures::executor::block_on;
     use std::collections::HashMap;
     // use anyhow::Result;
     // use proptest::prelude::*;
     use super::*;
     use serial_test::serial;
+
 
     //TODO: Setup pizza
     const PEER_ADDRS:&'static  [&'static str] = &[
@@ -327,10 +284,8 @@ mod tests {
     fn connect_to_peers() -> IpfsViaDaemon {
         let mut ipfs = IpfsViaDaemon::new().unwrap();
         for peer in PEER_ADDRS {
-            let result_peers = block_on(ipfs.connect_to(peer)).unwrap();
-            for result_peer in result_peers {
-                println!("Connected to peer! {}", result_peer);
-            }
+            block_on(ipfs.connect_to(peer)).unwrap();
+            println!("Connected to peer! {}", peer);
         }
         return ipfs;
     }
@@ -387,16 +342,13 @@ mod tests {
     #[serial]
     fn can_config() {
         let mut ipfs = IpfsViaDaemon::new().unwrap();
-        block_on(ipfs.config(&HashMap::from([
-            ("Datastore.StorageMax", "11GB"),
-            ("Datastore.GCPeriod", "2h"),
-        ])))
-        .unwrap();
-        block_on(ipfs.config(&HashMap::from([
-            ("Datastore.StorageMax", "10GB"),
-            ("Datastore.GCPeriod", "1h"),
-        ])))
-        .unwrap();
+        let mut config = block_on(ipfs.get_config()).unwrap();
+        config.datastore.as_object_mut().unwrap().insert("StorageMax".to_string(), Value::String("11GB".to_string()));
+        config.datastore.as_object_mut().unwrap().insert("GCPeriod".to_string(), Value::String("2h".to_string()));
+        block_on(ipfs.set_config(&config)).unwrap();
+        config.datastore.as_object_mut().unwrap().insert("StorageMax".to_string(), Value::String("10GB".to_string()));
+        config.datastore.as_object_mut().unwrap().insert("GCPeriod".to_string(), Value::String("1h".to_string()));
+        block_on(ipfs.set_config(&config)).unwrap();
         assert!(true)
     }
 }

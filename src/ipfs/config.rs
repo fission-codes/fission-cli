@@ -1,70 +1,91 @@
-pub mod Identity;
-pub mod Datastore;
-pub mod Mounts;
-pub mod Discovery;
-pub mod Routing;
-pub mod Ipns;
-pub mod Gateway;
-pub mod Swarm;
-pub mod Pubsub;
-pub mod Peering;
-pub mod DNS;
-pub mod Migration;
-pub mod Provider;
-pub mod Reprovider;
-pub mod Experimental;
-pub mod Plugins;
-pub mod Pinning;
-pub mod API;
-pub mod Addresses;
-pub mod AutoNAT;
+pub mod identity;
+pub mod datastore;
+pub mod mounts;
+pub mod discovery;
+pub mod routing;
+pub mod ipns;
+pub mod gateway;
+pub mod swarm;
+pub mod pubsub;
+pub mod peering;
+pub mod dns;
+pub mod migration;
+pub mod provider;
+pub mod reprovider;
+pub mod experimental;
+pub mod plugins;
+pub mod pinning;
+pub mod api;
+pub mod addresses;
+pub mod auto_nat;
 
 use serde::{Serialize, Deserialize};
+use serde_json::Value;
 
 #[derive(Clone, Debug, Serialize,  Deserialize)]
 pub struct Config{
+    #[serde(default)]
     #[serde(alias = "Identity")]
-    identity:Identity::Identity,
+    pub identity:Value,
+    #[serde(default)]
     #[serde(alias = "Datastore")]
-    datastore:Datastore::Datastore,
+    pub datastore:Value,
+    #[serde(default)]
     #[serde(alias = "Mounts")]
-    mounts:Mounts::Mounts,
+    pub mounts:Value,
+    #[serde(default)]
     #[serde(alias = "Discovery")]
-    discovery:Discovery::Discovery,
+    pub discovery:Value,
+    #[serde(default)]
     #[serde(alias = "Routing")]
-    routing:Routing::Routing,
+    pub routing:Value,
+    #[serde(default)]
     #[serde(alias = "Ipns")]
-    ipns:Ipns::Ipns,
+    pub ipns:Value,
+    #[serde(default)]
     #[serde(alias = "Gateway")]
-    gateway:Gateway::Gateway,
+    pub gateway:Value,
+    #[serde(default)]
     #[serde(alias = "Swarm")]
-    swarm:Swarm::Swarm,
+    pub swarm:Value,
+    #[serde(default)]
     #[serde(alias = "Pubsub")]
-    pubsub:Pubsub::Pubsub,
+    pub pubsub:Value,
+    #[serde(default)]
     #[serde(alias = "Peering")]
-    peering:Peering::Peering,
+    pub peering:Value,
+    #[serde(default)]
     #[serde(alias = "DNS")]
-    dns:DNS::DNS,
+    pub dns:Value,
+    #[serde(default)]
     #[serde(alias = "Migration")]
-    migration:Migration::Migration,
+    pub migration:Value,
+    #[serde(default)]
     #[serde(alias = "Provider")]
-    provider:Provider::Provider,
+    pub provider:Value,
+    #[serde(default)]
     #[serde(alias = "Reprovider")]
-    reprovider:Reprovider::Reprovider,
+    pub reprovider:Value,
+    #[serde(default)]
     #[serde(alias = "Experimental")]
-    experimental:Experimental::Experimental,
+    pub experimental:Value,
+    #[serde(default)]
     #[serde(alias = "Plugins")]
-    plugins:Plugins::Plugins,
+    pub plugins:Value,
+    #[serde(default)]
     #[serde(alias = "Pinning")]
-    pinning:Pinning::Pinning,
+    pub pinning:Value,
+    #[serde(default)]
     #[serde(alias = "API")]
-    api:API::API,
+    pub api:Value,
     #[serde(alias = "Addresses")]
-    addresses:Addresses::Addresses,
+    pub addresses:addresses::Addresses,
+    #[serde(default)]
     #[serde(alias = "AutoNAT")]
-    auto_nat:AutoNAT::AutoNAT,
+    pub auto_nat:Value,
+    #[serde(default)]
     #[serde(alias = "Bootstrap")]
-    bootstrap:Vec<String>
+    pub bootstrap:Vec<String>
 }
 
 
