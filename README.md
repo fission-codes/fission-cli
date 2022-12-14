@@ -24,10 +24,10 @@
 ##
 
 ### In Progress Notice
-This repository is a rewrite of our current Cli that can be found [here](https://github.com/fission-codes/fission/tree/main/fission-cli). The progress we are making tword finishing the rewrite can be seen on [this tracking issue](https://github.com/fission-codes/fission-cli/issues/1). However, our plan is to wrap the existing binary so that the application be used (hopefully) seemlessly even while the rewrite is still in progress.
+This repository is a rewrite of our current Cli that can be found [here](https://github.com/fission-codes/fission/tree/main/fission-cli). The progress we are making toward finishing the rewrite can be seen on [this tracking issue](https://github.com/fission-codes/fission-cli/issues/1). However, our plan is to wrap the existing binary so that the application be used even while the rewrite is still in progress.
 
 ### What does it do?
-This Cli allows a user to publish their client-side only websites to IPFS in view it an easy way.
+This CLI allows a user to publish front-end webapps to IPFS and view it an easy way.
 
 #### How Do I use it?
 Take a look at our [getting started](https://guide.fission.codes/developers/getting-started) page for more information.
@@ -39,7 +39,7 @@ Check out our [contibuting guide](./CONTRIBUTING.md) for more info surrounding h
 ### Working from Source
 
 #### Dependancies
-The only dependancy is [Rust](https://www.rust-lang.org/)
+The only dependancy is [Rust](https://www.rust-lang.org/).
 
 #### Build from Source
 `cargo run` or `cargo build` if you want to build without running it
