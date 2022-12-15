@@ -1,11 +1,10 @@
 use anyhow::{Result, bail};
 use serde_json::{Map, Value};
 
-/*
-Ipfs often returns json with a single property with the value being an array. 
-This function simply takes the array in that property and turns it into a vector that can be used in rust.
-It will return an error result if the json is not formatted in this way.
-*/
+
+/// Ipfs often returns json with a single property with the value being an array. 
+/// This function simply takes the array in that property and turns it into a vector that can be used in rust.
+/// It will return an error result if the json is not formatted in this way.
 pub fn value_to_vec<A>(json:&Value, index:&str) -> Result<Vec<A>> 
     where A:Clone + for<'de> serde::Deserialize<'de>{
     anyhow::Ok( match json.get(index) {

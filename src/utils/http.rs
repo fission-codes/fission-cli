@@ -131,37 +131,4 @@ impl HttpHandler {
         anyhow::Ok(response_data)
         
     }
-
-    pub async fn try_send_request<F>(&mut self, options:&HttpRequest, handler_option:Option<F>) -> Result<Vec<u8>>
-        where F: Fn(Vec<u8>) -> Result<bool>{
-        let mut attempt:u32 = 0;
-        'attempt_loop: loop {
-            attempt += 1;
-            if attempt != 1 {
-                std::thread::sleep(Duration::new(math::get_fibonacci(attempt), 0))
-            }
-            println!("attempting to send post request: attempt {} of {}", attempt, IPFS_RETRY_ATTEMPTS);
-            let is_final_attempt = attempt >= IPFS_RETRY_ATTEMPTS as u32;
-            let response_result = self.send_request(options).await;
-            let response = match is_final_attempt {
-                true => response_result?,
-                false => { match response_result {
-                    Ok(x) => x,
-                    Err(_) => continue 'attempt_loop
-                }}
-            };
-            if is_final_attempt && handler_option.as_ref().is_some(){
-                (handler_option.unwrap())(response.clone())?;
-            }else if handler_option.is_some(){
-                let handler_result = (handler_option.as_ref().unwrap())(response.clone());
-                if handler_result.is_err() {
-                    continue 'attempt_loop;
-                }else if !(handler_result.unwrap()) {
-                    continue 'attempt_loop;
-                }
-            }
-            return anyhow::Ok(response);
-        }
-    }
-    
 }
