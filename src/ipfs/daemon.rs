@@ -1,9 +1,10 @@
 use std::process::{Child, Command};
 use std::collections::HashMap;
-use std::thread::{self, sleep};
+use std::thread::sleep;
 use std::time::{SystemTime, Duration};
 
 use futures::executor::block_on;
+use serde_json::Value;
 use tokio::runtime::Runtime;
 use ipfs_api_backend_hyper::{TryFromUri, IpfsClient, IpfsApi, LoggingLevel, Logger};
 use anyhow::{bail, Result};
@@ -102,34 +103,40 @@ impl IpfsDaemon {
 
 #[async_trait]
 impl Ipfs for IpfsDaemon {
-    // async fn add_file(&self, path: &str) -> Result<HashMap<String, String>> {
-    //     todo!()
-    // }
-
     async fn add(&self, path: &Path) -> Result<HashMap<String, String>> {
-        // let mut form = Form::default();
-        // for entry_result in WalkDir::new(path) {
-        //     let entry = entry_result?;
-        //     form = form.add_file(entry.file_name(), entry.path())?;
-        // }
         let response_list = self.tokio.block_on(async {
             self.client.add_path(path).await
         })?;
-        //let response_list = self.client.add_path(path).await?;
         return Ok(response_list.into_iter().map(|res| {
             (res.name, res.hash)
         }).collect());
     }
-
     async fn connect_to(&self, peer_id: &str) -> Result<()> {
         todo!()
     }
+    async fn get_config(&self, prop:&str) -> Result<Value>{
+        let config = self.tokio.block_on(async {
+            self.client.config_get_json(prop).await
+        })?;
+        return Ok(config.value);
+    }
+    async fn set_config(&self, prop:&str, val:&Value) -> Result<()> {
+        if val.is_boolean() {
+            self.tokio.block_on(async {
+                self.client.config_set_bool(prop, val.as_bool().unwrap()).await
+            })?;
+            return Ok(());
+        }
+        if val.is_string() {
+            self.tokio.block_on(async {
+                self.client.config_set_string(prop, val.as_str().unwrap()).await
+            })?;
+            return Ok(());
+        }
+        self.tokio.block_on(async {
+            self.client.config_set_json(prop, &val.to_string()).await
+        })?;
 
-    // async fn get_config(&self) -> Result<Config>{
-    //     todo!()
-    // }
-
-    // async fn set_config(&self, options: &Config) -> Result<()> {
-    //     todo!()
-    // }
+        return Ok(());
+    }
 }
