@@ -1,9 +1,10 @@
-use std::process::{Child, Command};
+use std::process::Command;
 use std::collections::HashMap;
-use std::thread::sleep;
+use std::thread::{spawn, sleep};
 use std::time::{SystemTime, Duration};
 
 use futures::executor::block_on;
+use graceful::SignalGuard;
 use serde_json::Value;
 use tokio::runtime::Runtime;
 use ipfs_api_backend_hyper::{TryFromUri, IpfsClient, IpfsApi, LoggingLevel, Logger};
@@ -15,11 +16,9 @@ use std::path::Path;
 use crate::ipfs::Ipfs;
 use crate::utils::config::{IPFS_ADDR, IPFS_API_PORT, IPFS_EXE, IPFS_SLEEP_LENGTH, IPFS_BOOT_TIME_OUT};
 
-
 pub struct IpfsDaemon {
-    proccess: Option<Child>,
     client: IpfsClient,
-    tokio:Runtime
+    tokio: Runtime
 }
 
 impl IpfsDaemon {
@@ -28,50 +27,61 @@ impl IpfsDaemon {
 
         let runtime = tokio::runtime::Runtime::new().unwrap();
         Ok(Self{
-            proccess: None,
             client,
             tokio: runtime
         })   
     }
-    pub fn has_launched(&self) -> bool{
-        self.proccess.is_some()
-    }
-    pub async fn launch(&mut self) -> Result<()>{
+    pub async fn launch(&self) -> Result<()>{
+        //launch the daemon
         let api_addr = format!("/ip4/{}/tcp/{}", IPFS_ADDR, IPFS_API_PORT);
         println!("Launhing IPFS...");
-        let proccess = Command::new(IPFS_EXE)
+        Command::new(IPFS_EXE)
             .arg("--api")
             .arg(&api_addr)
             .arg("daemon")
             .spawn()
             .unwrap_or_else(|e| panic!("Failed to start IPFS daemon: {}\n This error may be because the Kubo binary is not on your PATH.", e));
-        self.proccess = Some(proccess);
+
+        //Wait ipfs to ready
         println!("Waiting for IPFS to ready..");
         self.await_ready().await?;
+
+        //Reduce log level for IPFS
         self.tokio.block_on(async {
             self.client.log_level(Logger::All, LoggingLevel::Error).await
         })?;
+        
+        //setup gracefull shutdown
+        println!("Creating gracefull shutdown for IPFS...");
+        let me = self.clone();
+        spawn(move || {
+            let signal_guard = SignalGuard::new();
+
+            signal_guard.at_exit(move |sig| {
+                println!("Signal {} received. Attempting to stop IPFS...", sig);
+                match me.shutdown() {
+                    Ok(_) => println!("{}", "IPFS has shutdown successfully.".green()),
+                    Err(_) => println!("{}", "IPFS failed to shutdown succefully! You may need to stop the proccess yourself.".red())
+                };
+            });
+        });
+
+        println!("{}", "IPFS has launched successfully!!".green());
         Ok(())
     }
-    pub fn shutdown(&mut self) -> Result<()>{
-        Ok(match self.proccess.as_mut() {
-            Some(process) => {
-                self.tokio.block_on(async {
-                    block_on(self.client.shutdown())
-                })?;
-                process.wait()?;
-                self.proccess = None;
-            },
-            None => ()
-        })
+    pub fn shutdown(&self) -> Result<()>{
+        self.tokio.block_on(async {
+            block_on(self.client.shutdown())
+        })?;
+        Ok(())
     }
     async fn is_ipfs_ready(&self) -> bool {
         let res = self.tokio.block_on(async {
-            self.client.config_get_json("API").await
+            self.client.config_show().await
         });
-        if res.is_ok() {
-            println!("Config is {}", res.as_ref().unwrap().value);
-        }
+        // if res.is_ok() {
+        //     println!("Config is {}", res.as_ref().unwrap());
+        // }
         return match res {
             Ok(_) => true,
             Err(_) => false
@@ -98,6 +108,12 @@ impl IpfsDaemon {
             }
         }
         anyhow::Ok(())
+    }
+}
+
+impl Clone for IpfsDaemon {
+    fn clone(&self) -> Self {
+        return Self { client: self.client.clone(), tokio: Runtime::new().unwrap() }
     }
 }
 
