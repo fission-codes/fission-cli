@@ -14,7 +14,7 @@ use crate::utils::file_management;
 fn run_ipfs_test<T>(test: T) -> ()
     where T: FnOnce(&IpfsDaemon) -> bool
 {
-    let ipfs = IpfsDaemon::new().unwrap();
+    let ipfs = IpfsDaemon::default();
     // for peer in PEER_ADDRS {
     //     block_on(ipfs.connect_to(peer)).unwrap();
     //     println!("Connected to peer! {}", peer);

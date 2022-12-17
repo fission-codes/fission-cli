@@ -1,39 +1,43 @@
-use std::process::Command;
+
 use std::collections::HashMap;
+use std::process::Command;
 use std::thread;
 use std::time::{SystemTime, Duration};
+use std::path::Path;
 
-use futures::executor::block_on;
-use graceful::SignalGuard;
-use serde_json::Value;
-use tokio::runtime::Runtime;
-use ipfs_api_backend_hyper::{TryFromUri, IpfsClient, IpfsApi, LoggingLevel, Logger};
 use anyhow::{bail, Result};
 use async_trait::async_trait;
 use colored::Colorize;
-use std::path::Path;
+use futures::executor::block_on;
+use graceful::SignalGuard;
+use ipfs_api_backend_hyper::{TryFromUri, IpfsClient, IpfsApi, LoggingLevel, Logger};
+use serde_json::Value;
+use tokio::runtime::Runtime;
 
 use crate::ipfs::Ipfs;
 use crate::utils::config::{IPFS_ADDR, IPFS_API_PORT, IPFS_EXE, IPFS_SLEEP_LENGTH, IPFS_BOOT_TIME_OUT};
 
+/// This struct is a wrapper for the information needed to point the IPFS daemon at a diffrent address
+/// than the default.
+#[derive(Clone, Debug)]
+pub struct IpfsConnInfo {
+    pub address:String,
+    pub port:u16
+}
+
 pub struct IpfsDaemon {
+    conn_info: IpfsConnInfo,
     client: IpfsClient,
     tokio: Runtime
 }
 
 impl IpfsDaemon {
-    pub fn new() -> Result<Self> {
-        let client = IpfsClient::from_host_and_port("http".parse()?, IPFS_ADDR, IPFS_API_PORT)?;
-
-        let runtime = tokio::runtime::Runtime::new().unwrap();
-        Ok(Self{
-            client,
-            tokio: runtime
-        })   
-    }
+    /// This method launches the IPFS daemon on the port/address given when the the instance was
+    /// created. During this proccess it also creates a thread that listens for a shutdown signal
+    /// and stops the IPFS daemon gracefully if the signal is given.
     pub async fn launch(&self) -> Result<()>{
         //launch the daemon
-        let api_addr = format!("/ip4/{}/tcp/{}", IPFS_ADDR, IPFS_API_PORT);
+        let api_addr = format!("/ip4/{}/tcp/{}", self.conn_info.address, self.conn_info.port);
         println!("Launhing IPFS...");
         Command::new(IPFS_EXE)
             .arg("--api")
@@ -69,12 +73,20 @@ impl IpfsDaemon {
         println!("{}", "IPFS has launched successfully!!".green());
         Ok(())
     }
+
+    /// This method sends an http signal to the IPFS deamon to shutdown. 
+    /// 
+    /// Note 1: This method should work even if the daemon was not started by this proccess.
+    /// 
+    /// Note 2: This method return when it recieves an http response from the daemon, and not
+    /// when the proccess has actually stopped.
     pub fn shutdown(&self) -> Result<()>{
         self.tokio.block_on(async {
             block_on(self.client.shutdown())
         })?;
         Ok(())
     }
+
     async fn is_ipfs_ready(&self) -> bool {
         let res = self.tokio.block_on(async {
             self.client.config_show().await
@@ -87,6 +99,7 @@ impl IpfsDaemon {
             Err(_) => false
         };
     }
+
     async fn await_ready(&self) -> Result<()> {
         let start_time = SystemTime::now();
         loop {
@@ -111,9 +124,44 @@ impl IpfsDaemon {
     }
 }
 
+impl TryFrom<IpfsConnInfo> for IpfsDaemon{
+    type Error = anyhow::Error;
+    /// This is one of the two main ways to make a new instance of the IPFS daemon struct. Use this
+    /// method when you want to make a new instance and you need to set the port and address of
+    /// the daemon you are attempting to refrence
+    fn try_from(conn_info: IpfsConnInfo) -> Result<Self> {
+        let client = IpfsClient::from_host_and_port(
+            "http".parse()?, 
+            &conn_info.address, 
+            conn_info.port
+        )?;
+
+        let runtime = tokio::runtime::Runtime::new()?;
+        Ok(Self{
+            client,
+            tokio: runtime,
+            conn_info
+        })   
+    }
+}
+
+impl Default for IpfsDaemon {
+    /// This is one of the two main ways to make a new instance of the IPFS daemon struct. Use this
+    /// method when you want to make a new instance and you okay with using the default port and address
+    /// set by the config.
+    /// 
+    /// Note: This method has the possiblity of throwing an error if the configuration of the port and
+    /// address is not setup right.
+    fn default() -> Self {
+        Self::try_from(IpfsConnInfo{
+            address:IPFS_ADDR.to_string(),
+            port:IPFS_API_PORT
+        }).unwrap()
+    }
+}
 impl Clone for IpfsDaemon {
     fn clone(&self) -> Self {
-        return Self { client: self.client.clone(), tokio: Runtime::new().unwrap() }
+        return Self { client: self.client.clone(), tokio: Runtime::new().unwrap(), conn_info: self.conn_info.clone()}
     }
 }
 
