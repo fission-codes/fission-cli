@@ -1,3 +1,6 @@
+use std::thread;
+use std::time::Duration;
+
 use colored::Colorize;
 use futures::executor::block_on;
 use serial_test::serial;
@@ -6,23 +9,6 @@ use self::daemon::IpfsDaemon;
 use super::*;
 use crate::ipfs::Ipfs;
 use crate::utils::file_management;
-
-//TODO: Setup pizza
-// const PEER_ADDRS:&'static  [&'static str] = &[
-//         "/dns4/production-ipfs-cluster-us-east-1-node2.runfission.com/tcp/4003/wss/p2p/12D3KooWQ2hL9NschcJ1Suqa1TybJc2ZaacqoQMBT3ziFC7Ye2BZ",
-//         "/dns4/production-ipfs-cluster-eu-north-1-node1.runfission.com/tcp/4003/wss/p2p/12D3KooWRwbRrSN2cPAKz4yt1vxBFdh53CpgWjSFK5hZPkzHHz5h",
-//         "/dns4/production-ipfs-cluster-eu-north-1-node1.runfission.com/tcp/4001/p2p/12D3KooWRwbRrSN2cPAKz4yt1vxBFdh53CpgWjSFK5hZPkzHHz5h",
-//         "/dns4/production-ipfs-cluster-mega-us-east-1-node0.runfission.com/tcp/4001/p2p/12D3KooWJQHUo1snJrv5NWVesFspjwhkNkaMu5M9cMdF1oF7ucTz",
-//         "/ip4/54.235.17.70/tcp/4001/p2p/12D3KooWJQHUo1snJrv5NWVesFspjwhkNkaMu5M9cMdF1oF7ucTz",
-//         "/ip4/54.235.17.70/udp/4001/quic/p2p/12D3KooWJQHUo1snJrv5NWVesFspjwhkNkaMu5M9cMdF1oF7ucTz",
-//         "/dns4/production-ipfs-cluster-mega-us-east-1-node0.runfission.com/tcp/4003/wss/p2p/12D3KooWJQHUo1snJrv5NWVesFspjwhkNkaMu5M9cMdF1oF7ucTz",
-//         "/dns4/production-ipfs-cluster-us-east-1-node2.runfission.com/tcp/4001/p2p/12D3KooWQ2hL9NschcJ1Suqa1TybJc2ZaacqoQMBT3ziFC7Ye2BZ",
-//         "/dns4/production-ipfs-cluster-eu-north-1-node0.runfission.com/tcp/4001/p2p/12D3KooWDTUTdVJfW7Rwb6kKhceEwevTatPXnavPwkfZp2A6r1Fn",
-//         "/dns4/production-ipfs-cluster-us-east-1-node1.runfission.com/tcp/4001/p2p/12D3KooWNntMEXRUa2dNgkQsVgzao6zGSYxm1oAs83YtRy6uBuxv",
-//         "/dns4/production-ipfs-cluster-eu-north-1-node0.runfission.com/tcp/4003/wss/p2p/12D3KooWDTUTdVJfW7Rwb6kKhceEwevTatPXnavPwkfZp2A6r1Fn",
-//         "/ip4/54.235.17.70/tcp/4003/wss/p2p/12D3KooWJQHUo1snJrv5NWVesFspjwhkNkaMu5M9cMdF1oF7ucTz",
-//         "/dns4/production-ipfs-cluster-us-east-1-node1.runfission.com/tcp/4003/wss/p2p/12D3KooWNntMEXRUa2dNgkQsVgzao6zGSYxm1oAs83YtRy6uBuxv",
-//     ];
 
 
 fn run_ipfs_test<T>(test: T) -> ()
@@ -42,31 +28,29 @@ fn run_ipfs_test<T>(test: T) -> ()
 fn are_files_uploaded(uploaded_paths:Vec<String>, os_paths:Vec<String>) -> bool{
     let mut is_uploaded = true;
     for os_path in os_paths{
-        let mut fixed_path_os_path = String::new();
-        let mut i = 0;
-        for seg in os_path.split("/") {
+        let mut fixed_os_path = String::new();
+        for (i, seg) in os_path.split("/").enumerate() {
             if seg != "." && !seg.is_empty() {
-                fixed_path_os_path += &(match i {
-                    0 => String::new(),
-                    1 => seg.to_string(),
+                fixed_os_path += &(match i {
+                    1 => String::new(),
+                    2 => seg.to_string(),
                     _ => "/".to_string() + seg
                 });
-                i += 1; 
             }
         }
 
         let mut is_any_matching = false;
         'any: for uploaded_path in &uploaded_paths {
-            if &fixed_path_os_path == uploaded_path {
-                println!("{} == {}", fixed_path_os_path.green(), uploaded_path.green());
+            if &fixed_os_path == uploaded_path {
+                println!("{} == {}", fixed_os_path.green(), uploaded_path.green());
                 is_any_matching = true;
                 break 'any;
             }else{
-                println!("{} == {}", fixed_path_os_path.red(), uploaded_path.red());
+                println!("{} == {}", fixed_os_path.red(), uploaded_path.red());
             }
         };
         if !is_any_matching{
-            println!("Failed to match {}", fixed_path_os_path.red());
+            println!("Failed to match {}", fixed_os_path.red());
             is_uploaded = false;
         }
     }
@@ -125,5 +109,37 @@ fn can_config() {
         let new_config = block_on(ipfs.get_config(test_prop)).unwrap();
         block_on(ipfs.set_config(test_prop, &old_config)).unwrap();
         test_value == new_config
+    });
+}
+#[test]
+#[serial]
+fn can_add_bootstrap() {
+    //TODO: Setup pizza
+    let test_peer = "/dns4/production-ipfs-cluster-us-east-1-node2.runfission.com/tcp/4003/wss/p2p/12D3KooWQ2hL9NschcJ1Suqa1TybJc2ZaacqoQMBT3ziFC7Ye2BZ";
+    run_ipfs_test(|ipfs| {
+        block_on(ipfs.add_bootstrap(test_peer)).unwrap();
+        let is_config_changed = block_on(ipfs.get_config("Bootstrap"))
+            .unwrap()
+            .as_array()
+            .unwrap()
+            .contains(&Value::String(test_peer.to_string()));
+        if !is_config_changed {
+            println!("{}", "Config failed to be changed!".red());
+        }
+        is_config_changed
+    });
+    thread::sleep(Duration::new(3, 0));//This is to give IPFS enough time to shut down properly
+    run_ipfs_test(|ipfs| {
+        let peers = block_on(ipfs.get_connected()).unwrap();
+        peers.iter().for_each(|peer| println!("{}", peer.blue()));
+        let is_config_changed = block_on(ipfs.get_config("Bootstrap"))
+            .unwrap()
+            .as_array()
+            .unwrap()
+            .contains(&Value::String(test_peer.to_string()));
+        if !is_config_changed {
+            println!("{}", "Config failed to be changed!".red())
+        }
+        peers.contains(&test_peer.to_string())
     });
 }

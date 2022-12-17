@@ -1,6 +1,6 @@
 use std::process::Command;
 use std::collections::HashMap;
-use std::thread::{spawn, sleep};
+use std::thread;
 use std::time::{SystemTime, Duration};
 
 use futures::executor::block_on;
@@ -54,7 +54,7 @@ impl IpfsDaemon {
         //setup gracefull shutdown
         println!("Creating gracefull shutdown for IPFS...");
         let me = self.clone();
-        spawn(move || {
+        thread::spawn(move || {
             let signal_guard = SignalGuard::new();
 
             signal_guard.at_exit(move |sig| {
@@ -97,7 +97,7 @@ impl IpfsDaemon {
                 break;
             }
 
-            sleep(Duration::new(IPFS_SLEEP_LENGTH as u64, 0));
+            thread::sleep(Duration::new(IPFS_SLEEP_LENGTH as u64, 0));
 
             let now = SystemTime::now();
             if now.duration_since(start_time)? > Duration::new(IPFS_BOOT_TIME_OUT as u64, 0) {
@@ -127,8 +127,20 @@ impl Ipfs for IpfsDaemon {
             (res.name, res.hash)
         }).collect());
     }
-    async fn connect_to(&self, peer_id: &str) -> Result<()> {
-        todo!()
+    async fn add_bootstrap(&self, peer_id: &str) -> Result<()> {
+        let mut old_peers = self.get_config("Bootstrap")
+            .await?
+            .as_array()
+            .unwrap()
+            .clone();
+        old_peers.push(Value::String(peer_id.to_string()));
+        self.set_config("Bootstrap", &Value::Array(old_peers)).await
+    }
+    async fn get_connected(&self) -> Result<Vec<String>> {
+        let peers =  self.tokio.block_on(async {
+            self.client.swarm_peers().await
+        })?;
+        Ok(peers.peers.into_iter().map(|peer| peer.addr).collect())
     }
     async fn get_config(&self, prop:&str) -> Result<Value>{
         let config = self.tokio.block_on(async {

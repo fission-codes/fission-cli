@@ -3,7 +3,6 @@
 */
 
 use std::{
-    time::Duration, 
     collections::HashMap, 
     io::Write
 };
@@ -18,10 +17,7 @@ use hyper::{
     body::HttpBody
 };
 
-use crate::utils::{
-    config::*,
-    math
-};
+use crate::utils::config::*;
 
 
 pub struct PostOptions {
