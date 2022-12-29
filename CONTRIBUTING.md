@@ -83,7 +83,7 @@ need to be the best programmer to contribute. Our discord is open for questions
 	- You can learn more about cloning repositories [here][git-clone].
 
  6. **Build** the project
-    - For a detailed look on how to build {{project-name}} look at our
+    - For a detailed look on how to build the Fission CLI look at our
       [README file](./README.md).
 
  7. **Start writing** your code
