@@ -113,33 +113,10 @@ fn can_config() {
 }
 #[test]
 #[serial]
-fn can_add_bootstrap() {
-    //TODO: Setup pizza
+fn can_connect() {
     let test_peer = "/dns4/production-ipfs-cluster-us-east-1-node2.runfission.com/tcp/4003/wss/p2p/12D3KooWQ2hL9NschcJ1Suqa1TybJc2ZaacqoQMBT3ziFC7Ye2BZ";
     run_ipfs_test(|ipfs| {
-        block_on(ipfs.add_bootstrap(test_peer)).unwrap();
-        let is_config_changed = block_on(ipfs.get_config("Bootstrap"))
-            .unwrap()
-            .as_array()
-            .unwrap()
-            .contains(&Value::String(test_peer.to_string()));
-        if !is_config_changed {
-            println!("{}", "Config failed to be changed!".red());
-        }
-        is_config_changed
-    });
-    thread::sleep(Duration::new(3, 0));//This is to give IPFS enough time to shut down properly
-    run_ipfs_test(|ipfs| {
-        let peers = block_on(ipfs.get_connected()).unwrap();
-        peers.iter().for_each(|peer| println!("{}", peer.blue()));
-        let is_config_changed = block_on(ipfs.get_config("Bootstrap"))
-            .unwrap()
-            .as_array()
-            .unwrap()
-            .contains(&Value::String(test_peer.to_string()));
-        if !is_config_changed {
-            println!("{}", "Config failed to be changed!".red())
-        }
-        peers.contains(&test_peer.to_string())
+        let res = block_on(ipfs.connect_to(test_peer));
+        res.is_ok()
     });
 }

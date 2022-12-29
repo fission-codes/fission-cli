@@ -20,7 +20,7 @@ bytes = "1.2"
 tokio = { version = "1", features = ["full"] }
 async-trait = "0.1"
 futures = "0.3"
-ipfs-api-backend-hyper = "0.5"
+ipfs-api-backend-hyper = {git="https://github.com/BoisterousCoder/rust-ipfs-api.git"} #This is temporary until change get merge and released into the main package
 walkdir = "2.3"
 graceful = "0.1"
 

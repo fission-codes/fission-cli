@@ -175,14 +175,17 @@ impl Ipfs for IpfsDaemon {
             (res.name, res.hash)
         }).collect());
     }
-    async fn add_bootstrap(&self, peer_id: &str) -> Result<()> {
-        let mut old_peers = self.get_config("Bootstrap")
-            .await?
-            .as_array()
-            .unwrap()
-            .clone();
-        old_peers.push(Value::String(peer_id.to_string()));
-        self.set_config("Bootstrap", &Value::Array(old_peers)).await
+    async fn connect_to(&self, peer_id: &str) -> Result<()> {
+        let messages =  self.tokio.block_on(async {
+            self.client.swarm_connect(peer_id).await
+        })?.strings;
+        for msg in messages {
+            println!("{}", msg.blue());
+            if !msg.contains("success"){
+                bail!(msg);
+            }
+        }
+        return Ok(());
     }
     async fn get_connected(&self) -> Result<Vec<String>> {
         let peers =  self.tokio.block_on(async {
