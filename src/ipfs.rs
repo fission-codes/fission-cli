@@ -16,7 +16,7 @@ pub trait Ipfs {
     async fn add(&self, path:&Path) -> Result<HashMap<String, String>>;
     /// This method connect to the given address, adding the address to the current swarm
     async fn connect_to(&self, peer_id:&str) -> Result<()>;
-    /// This method will return a list of all the addresses that are currently connected
+    /// This method returns a list of all the addresses that are currently connected
     async fn get_connected(&self) -> Result<Vec<String>>;
     /// This method will change a the value of a given property in the IPFS config
     /// 
