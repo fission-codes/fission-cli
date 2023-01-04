@@ -22,7 +22,7 @@ pub trait Ipfs {
     /// 
     /// Ex. `ipfs.set_config("Datastore.StorageMax", "11GB")`
     async fn set_config(&self, property:&str, val:&Value) -> Result<()>;
-    /// This method will return the value a given property in the IPFS config
+    /// This method returns the value a property in the IPFS config
     /// 
     /// Ex. `ipfs.get_config("Datastore.StorageMax")`
     async fn get_config(&self, property:&str) -> Result<Value>;
