@@ -14,7 +14,7 @@ pub trait Ipfs {
     /// This method uploads a file or directory at a given path to the IPFS swarm you are
     /// currently connected to.
     async fn add(&self, path:&Path) -> Result<HashMap<String, String>>;
-    /// This method connect to the given address, adding the address to the current swarm
+    /// This method connects to the given address, adding the address to the current swarm
     async fn connect_to(&self, peer_id:&str) -> Result<()>;
     /// This method returns a list of all the addresses that are currently connected
     async fn get_connected(&self) -> Result<Vec<String>>;
