@@ -71,7 +71,7 @@ fn main() {
             keyfile,
             os,
             verbose,
-            remote
+            remote,
         } => match run_setup_command(username, email, keyfile, os, verbose, remote) {
             Ok(()) => (),
             Err(_err) => eprintln!("💥 Failed to execute setup command."),
