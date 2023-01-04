@@ -18,7 +18,7 @@ pub trait Ipfs {
     async fn connect_to(&self, peer_id:&str) -> Result<()>;
     /// This method returns a list of all the addresses that are currently connected
     async fn get_connected(&self) -> Result<Vec<String>>;
-    /// This method will change a the value of a given property in the IPFS config
+    /// This method changes the value of a given property in the IPFS config
     /// 
     /// Ex. `ipfs.set_config("Datastore.StorageMax", "11GB")`
     async fn set_config(&self, property:&str, val:&Value) -> Result<()>;
