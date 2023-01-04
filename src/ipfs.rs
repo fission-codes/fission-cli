@@ -11,7 +11,7 @@ pub mod tests;
 
 #[async_trait]
 pub trait Ipfs {
-    /// This method upload a given file or directory at a given path to the IPFS swarm you are
+    /// This method uploads a file or directory at a given path to the IPFS swarm you are
     /// currently connected to.
     async fn add(&self, path:&Path) -> Result<HashMap<String, String>>;
     /// This method connect to the given address, adding the address to the current swarm
