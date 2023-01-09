@@ -11,7 +11,7 @@ pub fn get_files_in(dir: &str) -> Result<HashMap<String, Vec<u8>>> {
             Ok(x) => x,
             Err(e) => bail!(
                 "{}\n{}",
-                "failled to get item in directory, failed with error:".red(),
+                "failed to get item in directory, failed with error:".red(),
                 e
             ),
         };

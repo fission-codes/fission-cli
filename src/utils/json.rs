@@ -54,7 +54,7 @@ where
             // println!("{} <=> {} = {}", prop, prop_to_match, prop.to_owned() == prop_to_match);
             let new_val = if prop.to_owned() == prop_to_match {
                 change_json_part(val, new_loc, to)?
-            }else{
+            } else {
                 change_json_part(val, loc.clone(), to)?
             };
             new_root.insert(prop.to_owned(), new_val);

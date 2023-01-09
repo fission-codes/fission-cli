@@ -1,6 +1,3 @@
-use std::thread;
-use std::time::Duration;
-
 use colored::Colorize;
 use futures::executor::block_on;
 use serial_test::serial;
@@ -15,10 +12,6 @@ where
     T: FnOnce(&IpfsDaemon) -> bool,
 {
     let ipfs = IpfsDaemon::default();
-    // for peer in PEER_ADDRS {
-    //     block_on(ipfs.connect_to(peer)).unwrap();
-    //     println!("Connected to peer! {}", peer);
-    // }
     block_on(ipfs.launch()).unwrap();
     let has_passed = test(&ipfs);
     ipfs.shutdown().unwrap();
@@ -63,7 +56,7 @@ fn can_add_directory() {
     let test_dir = "./test-dir/more-tests";
     run_ipfs_test(|ipfs| {
         let hashes = block_on(ipfs.add(Path::new(test_dir))).unwrap();
-        println!("{}", "Finnished Hashes:".green());
+        println!("{}", "Finished Hashes:".green());
         for (path, hash) in &hashes {
             println!("{}: {}", path.green(), hash.blue())
         }
@@ -81,7 +74,7 @@ fn can_add_file() {
     let test_file = "./test-dir/test.txt";
     run_ipfs_test(|ipfs| {
         let hashes = block_on(ipfs.add(Path::new(test_file))).unwrap();
-        println!("{}", "Finnished Hashes:\n".green());
+        println!("{}", "Finished Hashes:\n".green());
         for (path, hash) in &hashes {
             println!("{}: {}", path.green(), hash.blue())
         }

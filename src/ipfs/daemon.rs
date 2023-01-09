@@ -42,7 +42,7 @@ impl IpfsDaemon {
             "/ip4/{}/tcp/{}",
             self.conn_info.address, self.conn_info.port
         );
-        println!("Launhing IPFS...");
+        println!("Launching IPFS...");
         Command::new(IPFS_EXE)
             .arg("--api")
             .arg(&api_addr)
@@ -50,7 +50,7 @@ impl IpfsDaemon {
             .spawn()
             .unwrap_or_else(|e| panic!("Failed to start IPFS daemon: {}\n This error may be because the Kubo binary is not on your PATH.", e));
 
-        //Wait ipfs to ready
+        //Wait ipfs to be ready
         println!("Waiting for IPFS to ready..");
         self.await_ready().await?;
 
@@ -96,9 +96,6 @@ impl IpfsDaemon {
         let res = self
             .tokio
             .block_on(async { self.client.config_show().await });
-        // if res.is_ok() {
-        //     println!("Config is {}", res.as_ref().unwrap());
-        // }
         return match res {
             Ok(_) => true,
             Err(_) => false,
@@ -108,7 +105,7 @@ impl IpfsDaemon {
     async fn await_ready(&self) -> Result<()> {
         let start_time = SystemTime::now();
         loop {
-            println!("{}", "checking if ipfs is ready...".green());
+            println!("{}", "Checking if ipfs is ready...".green());
 
             if self.is_ipfs_ready().await {
                 println!("{}", "IPFS is ready!!".green());
@@ -224,6 +221,12 @@ impl Ipfs for IpfsDaemon {
                     .await
             })?;
             return Ok(());
+        }
+        if val.is_number() || val.is_null() {
+            bail!(
+                "{}",
+                "The IPFS config API does not suport null or number json types"
+            )
         }
         self.tokio
             .block_on(async { self.client.config_set_json(prop, &val.to_string()).await })?;

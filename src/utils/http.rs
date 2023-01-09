@@ -100,7 +100,7 @@ impl HttpHandler {
             true => {
                 let mut body_parts = vec![];
                 for post_options in &options.post_options {
-                    write!(body_parts, "--{}\r\n", HTTP_BOUNDARY)?;
+                    write!(body_parts, "--{}\r\n", HTTP_MULTIPART_BOUNDARY)?;
                     for (header_prop, header_val) in &post_options.headers {
                         write!(body_parts, "{}: {}\r\n", header_prop, header_val)?;
                     }
@@ -110,13 +110,16 @@ impl HttpHandler {
                     };
                     write!(body_parts, "\r\n{}\r\n", data_text)?;
                 }
-                write!(body_parts, "--{}--\r\n", HTTP_BOUNDARY)?;
+                write!(body_parts, "--{}--\r\n", HTTP_MULTIPART_BOUNDARY)?;
                 match options.post_options.len() {
                     0 => request_builder.body(Body::from(Bytes::new()))?,
                     _ => request_builder
                         .header(
                             "Content-Type",
-                            &*format!("multipart/form-data; boundary=\"{}\"", HTTP_BOUNDARY),
+                            &*format!(
+                                "multipart/form-data; boundary=\"{}\"",
+                                HTTP_MULTIPART_BOUNDARY
+                            ),
                         )
                         .body(Body::from(body_parts))?,
                 }
