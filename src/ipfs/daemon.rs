@@ -33,8 +33,8 @@ pub struct IpfsDaemon {
 }
 
 impl IpfsDaemon {
-    /// This method launches the IPFS daemon on the port/address given when the the instance was
-    /// created. During this proccess it also creates a thread that listens for a shutdown signal
+    /// This method launches the IPFS daemon on the port/address given when the instance was
+    /// created. During this proccess, it also creates a thread that listens for a shutdown signal
     /// and stops the IPFS daemon gracefully if the signal is given.
     pub async fn launch(&self) -> Result<()> {
         //launch the daemon
@@ -50,19 +50,19 @@ impl IpfsDaemon {
             .spawn()
             .unwrap_or_else(|e| panic!("Failed to start IPFS daemon: {}\n This error may be because the Kubo binary is not on your PATH.", e));
 
-        //Wait ipfs to be ready
+        // Wait ipfs to be ready
         println!("Waiting for IPFS to ready..");
         self.await_ready().await?;
 
-        //Reduce log level for IPFS
+        // Reduce log level for IPFS
         self.tokio.block_on(async {
             self.client
                 .log_level(Logger::All, LoggingLevel::Error)
                 .await
         })?;
 
-        //setup gracefull shutdown
-        println!("Creating gracefull shutdown for IPFS...");
+        // Setup graceful shutdown
+        println!("Creating graceful shutdown for IPFS...");
         let me = self.clone();
         thread::spawn(move || {
             let signal_guard = SignalGuard::new();
@@ -84,7 +84,7 @@ impl IpfsDaemon {
     ///
     /// Note 1: This method should work even if the daemon was not started by this proccess.
     ///
-    /// Note 2: This method return when it recieves an http response from the daemon, and not
+    /// Note 2: This method returns when it recieves an http response from the daemon, not
     /// when the proccess has actually stopped.
     pub fn shutdown(&self) -> Result<()> {
         self.tokio
@@ -118,7 +118,7 @@ impl IpfsDaemon {
             if now.duration_since(start_time)? > Duration::new(IPFS_BOOT_TIME_OUT as u64, 0) {
                 bail!(
                     "{}",
-                    "Failed to start ipfs because the timeout reached!!".red()
+                    "Failed to start IPFS because the timeout reached!!".red()
                 )
             }
         }
@@ -128,9 +128,9 @@ impl IpfsDaemon {
 
 impl TryFrom<IpfsConnInfo> for IpfsDaemon {
     type Error = anyhow::Error;
-    /// This is one of the two main ways to make a new instance of the IPFS daemon struct. Use this
+    /// This is one of the two ways to make a new instance of the IPFS daemon struct. Use this
     /// method when you want to make a new instance and you need to set the port and address of
-    /// the daemon you are attempting to refrence
+    /// the daemon you are attempting to reference
     fn try_from(conn_info: IpfsConnInfo) -> Result<Self> {
         let client =
             IpfsClient::from_host_and_port("http".parse()?, &conn_info.address, conn_info.port)?;
@@ -145,7 +145,7 @@ impl TryFrom<IpfsConnInfo> for IpfsDaemon {
 }
 
 impl Default for IpfsDaemon {
-    /// This is one of the two main ways to make a new instance of the IPFS daemon struct. Use this
+    /// This is one of the two ways to make a new instance of the IPFS daemon struct. Use this
     /// method when you want to make a new instance and you okay with using the default port and address
     /// set by the config.
     ///

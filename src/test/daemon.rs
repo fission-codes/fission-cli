@@ -30,15 +30,19 @@ fn are_files_uploaded(uploaded_paths: Vec<String>, os_paths: Vec<String>) -> boo
     let mut is_uploaded = true;
     let drop_point = DATA_FOLDER.split("/").count();
     for os_path in os_paths {
-        let fixed_os_path:String = os_path.split("/").enumerate().filter_map(|(i, seg)| {
-            return if i < drop_point{
-                None
-            } else if i == drop_point {
-                Some(seg.to_string())
-            } else {
-                Some("/".to_string() + seg)
-            };
-        }).collect();
+        let fixed_os_path: String = os_path
+            .split("/")
+            .enumerate()
+            .filter_map(|(i, seg)| {
+                return if i < drop_point {
+                    None
+                } else if i == drop_point {
+                    Some(seg.to_string())
+                } else {
+                    Some("/".to_string() + seg)
+                };
+            })
+            .collect();
 
         let mut is_any_matching = false;
         'any: for uploaded_path in &uploaded_paths {
@@ -61,7 +65,7 @@ fn are_files_uploaded(uploaded_paths: Vec<String>, os_paths: Vec<String>) -> boo
 #[test]
 #[serial]
 fn can_add_directory() {
-    let test_dir =  DATA_FOLDER.to_string() + "/more-tests";
+    let test_dir = DATA_FOLDER.to_string() + "/more-tests";
     run_ipfs_test(|ipfs| {
         let hashes = block_on(ipfs.add(Path::new(&test_dir))).unwrap();
         println!("{}", "Finished Hashes:".green());
@@ -79,7 +83,7 @@ fn can_add_directory() {
 #[test]
 #[serial]
 fn can_add_file() {
-    let test_file = DATA_FOLDER.to_string() +"/test.txt";
+    let test_file = DATA_FOLDER.to_string() + "/test.txt";
     run_ipfs_test(|ipfs| {
         let hashes = block_on(ipfs.add(Path::new(&test_file))).unwrap();
         println!("{}", "Finished Hashes:\n".green());
