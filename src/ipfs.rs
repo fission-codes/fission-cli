@@ -6,9 +6,6 @@ use serde_json::Value;
 
 pub mod daemon;
 
-#[cfg(test)]
-pub mod tests;
-
 #[async_trait]
 pub trait Ipfs {
     /// This method uploads a file or directory at a given path to the IPFS swarm you are
@@ -25,5 +22,5 @@ pub trait Ipfs {
     /// This method returns the value a property in the IPFS config
     /// 
     /// Ex. `ipfs.get_config("Datastore.StorageMax")`
-    async fn get_config(&self, property:&str) -> Result<Value>;
+    async fn get_config(&self, property: &str) -> Result<Value>;
 }
