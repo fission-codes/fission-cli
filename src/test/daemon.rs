@@ -1,9 +1,17 @@
+/*
+    TODO: Most of these integration tests currently rely upon Ipfs. There is an issue open to fix this. See https://github.com/fission-codes/fission-cli/issues/29
+*/
+
+const DATA_FOLDER: &'static str = "./src/test/data";
+
+use std::path::Path;
+
 use colored::Colorize;
 use futures::executor::block_on;
+use serde_json::Value;
 use serial_test::serial;
 
-use self::daemon::IpfsDaemon;
-use super::*;
+use crate::ipfs::daemon::IpfsDaemon;
 use crate::ipfs::Ipfs;
 use crate::utils::file_management;
 
@@ -20,17 +28,17 @@ where
 
 fn are_files_uploaded(uploaded_paths: Vec<String>, os_paths: Vec<String>) -> bool {
     let mut is_uploaded = true;
+    let drop_point = DATA_FOLDER.split("/").count();
     for os_path in os_paths {
-        let mut fixed_os_path = String::new();
-        for (i, seg) in os_path.split("/").enumerate() {
-            if seg != "." && !seg.is_empty() {
-                fixed_os_path += &(match i {
-                    1 => String::new(),
-                    2 => seg.to_string(),
-                    _ => "/".to_string() + seg,
-                });
-            }
-        }
+        let fixed_os_path:String = os_path.split("/").enumerate().filter_map(|(i, seg)| {
+            return if i < drop_point{
+                None
+            } else if i == drop_point {
+                Some(seg.to_string())
+            } else {
+                Some("/".to_string() + seg)
+            };
+        }).collect();
 
         let mut is_any_matching = false;
         'any: for uploaded_path in &uploaded_paths {
@@ -53,15 +61,15 @@ fn are_files_uploaded(uploaded_paths: Vec<String>, os_paths: Vec<String>) -> boo
 #[test]
 #[serial]
 fn can_add_directory() {
-    let test_dir = "./test-dir/more-tests";
+    let test_dir =  DATA_FOLDER.to_string() + "/more-tests";
     run_ipfs_test(|ipfs| {
-        let hashes = block_on(ipfs.add(Path::new(test_dir))).unwrap();
+        let hashes = block_on(ipfs.add(Path::new(&test_dir))).unwrap();
         println!("{}", "Finished Hashes:".green());
         for (path, hash) in &hashes {
             println!("{}: {}", path.green(), hash.blue())
         }
 
-        let files = file_management::get_files_in(test_dir).unwrap();
+        let files = file_management::get_files_in(&test_dir).unwrap();
 
         let uploaded_paths = hashes.into_iter().map(|(path, _)| path).collect();
         let os_paths = files.into_iter().map(|(path, _)| path).collect();
@@ -71,9 +79,9 @@ fn can_add_directory() {
 #[test]
 #[serial]
 fn can_add_file() {
-    let test_file = "./test-dir/test.txt";
+    let test_file = DATA_FOLDER.to_string() +"/test.txt";
     run_ipfs_test(|ipfs| {
-        let hashes = block_on(ipfs.add(Path::new(test_file))).unwrap();
+        let hashes = block_on(ipfs.add(Path::new(&test_file))).unwrap();
         println!("{}", "Finished Hashes:\n".green());
         for (path, hash) in &hashes {
             println!("{}: {}", path.green(), hash.blue())

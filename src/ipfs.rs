@@ -6,9 +6,6 @@ use serde_json::Value;
 
 pub mod daemon;
 
-#[cfg(test)]
-pub mod tests;
-
 #[async_trait]
 pub trait Ipfs {
     /// This method upload a given file or directory at a given path to the IPFS swarm you are
