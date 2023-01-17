@@ -5,7 +5,6 @@ use async_trait::async_trait;
 use serde_json::Value;
 
 pub mod daemon;
-
 #[async_trait]
 pub trait Ipfs {
     /// This method uploads a file or directory at a given path to the IPFS swarm you are
@@ -17,10 +16,27 @@ pub trait Ipfs {
     async fn get_connected(&self) -> Result<Vec<String>>;
     /// This method changes the value of a given property in the IPFS config
     /// 
-    /// Ex. `ipfs.set_config("Datastore.StorageMax", "11GB")`
+    /// ```no_run
+    /// use fission::ipfs::daemon::IpfsDaemon;
+    /// use fission::ipfs::Ipfs;
+    /// use futures::executor::block_on;
+    /// use serde_json::Value;
+    /// 
+    /// let ipfs = IpfsDaemon::default();
+    /// let config_value = Value::from("11GB");
+    /// block_on(ipfs.set_config("Datastore.StorageMax", &config_value)).unwrap();
+    /// ```
     async fn set_config(&self, property:&str, val:&Value) -> Result<()>;
+    
     /// This method returns the value a property in the IPFS config
     /// 
-    /// Ex. `ipfs.get_config("Datastore.StorageMax")`
+    /// ```no_run
+    /// use fission::ipfs::daemon::IpfsDaemon;
+    /// use fission::ipfs::Ipfs;
+    /// use futures::executor::block_on;
+    /// 
+    /// let ipfs = IpfsDaemon::default();
+    /// let config_value = block_on(ipfs.get_config("Datastore.StorageMax")).unwrap();
+    /// ```
     async fn get_config(&self, property: &str) -> Result<Value>;
 }
