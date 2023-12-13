@@ -23,8 +23,10 @@
 
 ##
 
-### In Progress Notice
-This repository is a rewrite of our current Cli that can be found [here](https://github.com/fission-codes/fission/tree/main/fission-cli). The progress we are making toward finishing the rewrite can be seen on [this tracking issue](https://github.com/fission-codes/fission-cli/issues/1). However, our plan is to wrap the existing binary so that the application be used even while the rewrite is still in progress.
+### Note: **This is Archived**
+
+This repository used to be a rewrite of an old Cli that can be found [here](https://github.com/fission-codes/fission/tree/main/fission-cli). The progress we are making toward finishing the rewrite can be seen on [this tracking issue](https://github.com/fission-codes/fission-cli/issues/1).
+However, we're also rewriting the server implementation now, which lives at [`fission-codes/fission-server`](https://github.com/fission-codes/fission-server) and the monorepo contains a new CLI implementation in its [`fission-cli/` directory](https://github.com/fission-codes/fission-server/tree/main/fission-cli).
 
 ### What does it do?
 This CLI allows a user to publish front-end webapps to IPFS and view it an easy way.
